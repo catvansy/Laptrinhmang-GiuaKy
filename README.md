@@ -1,4 +1,3 @@
-# Laptrinhmang-GiuaKy
 # Game Tic Tac Toe Multiplayer
 
 Game Tic Tac Toe (Caro 3x3) sử dụng Java Socket với mô hình Multi Client-Server.
@@ -7,7 +6,7 @@ Game Tic Tac Toe (Caro 3x3) sử dụng Java Socket với mô hình Multi Client
 
 1. Biên dịch các file Java:
 ```bash
-cd "d:\Baitap\làm game\TicTacToeGame\src"
+javac TicTacToeServer.java TicTacToeClient.java
 ```
 
 2. Chạy Server:
@@ -41,19 +40,20 @@ java TicTacToeClient
 ## Protocol giao tiếp Client-Server
 
 ### Từ Server đến Client:
-- `GAME_START|X` hoặc `GAME_START|O`: Bắt đầu game, chỉ định ký hiệu cho người chơi
-- `YOUR_TURN`: Đến lượt người chơi hiện tại
-- `OPPONENT_TURN`: Đến lượt đối thủ
-- `MOVE|position|symbol`: Nước đi mới (vị trí và ký hiệu)
-- `GAME_END|result`: Kết thúc game (X_WIN, O_WIN, hoặc DRAW)
-- `OPPONENT_DISCONNECTED`: Đối thủ đã ngắt kết nối
+- `BAT_DAU|X` hoặc `BAT_DAU|O`: Bắt đầu game, chỉ định ký hiệu cho người chơi
+- `LUOT_CUA_BAN`: Đến lượt người chơi hiện tại
+- `LUOT_DOI_THU`: Đến lượt đối thủ
+- `DANH|position|symbol`: Nước đi mới (vị trí và ký hiệu)
+- `KET_THUC|result`: Kết thúc game (X_THANG, O_THANG, hoặc HOA)
+- `DOI_THU_THOAT`: Đối thủ đã ngắt kết nối
 
 ### Từ Client đến Server:
-- `MOVE|position`: Gửi nước đi (vị trí 0-8)
+- `DANH|position`: Gửi nước đi (vị trí 0-8)
+- `CHOI_LAI`: Yêu cầu chơi game mới
 
 ## Lưu ý
 
-- Server chạy trên port 5000
+- Server chạy trên port 5001
 - Mặc định kết nối đến localhost
 - Cần chạy Server trước khi chạy Client
 - Cần ít nhất 2 Client để bắt đầu game
