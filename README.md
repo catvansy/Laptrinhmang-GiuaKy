@@ -4,19 +4,24 @@ Game Tic Tac Toe (Caro 3x3) sử dụng Java Socket với mô hình Multi Client
 
 ## Cách chạy chương trình
 
-1. Biên dịch các file Java:
+1. Di chuyển vào thư mục src:
 ```bash
-javac TicTacToeServer.java TicTacToeClient.java
+cd TicTacToeGame/src
 ```
 
-2. Chạy Server:
+2. Biên dịch các file Java:
 ```bash
-java TicTacToeServer
+javac main/TicTacToeServer.java main/TicTacToeClient.java
 ```
 
-3. Chạy Client (có thể chạy nhiều client):
+3. Chạy Server:
 ```bash
-java TicTacToeClient
+java main.TicTacToeServer
+```
+
+4. Chạy Client (có thể chạy nhiều client):
+```bash
+java main.TicTacToeClient
 ```
 
 ## Cách chơi
