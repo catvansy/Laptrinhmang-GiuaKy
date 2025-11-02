@@ -6,7 +6,7 @@ Game Tic Tac Toe (Caro 3x3) sử dụng Java Socket với mô hình Multi Client
 
 1. Di chuyển vào thư mục src:
 ```bash
-cd TicTacToeGame/src
+cd src
 ```
 
 2. Biên dịch các file Java:
