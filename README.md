@@ -61,8 +61,6 @@ java main.TicTacToeClient
 - Server chạy trên port 5001
 - Mặc định kết nối đến localhost
 - Cần chạy Server trước khi chạy Client
-<<<<<<< HEAD
 - Cần ít nhất 2 Client để bắt đầu game
-=======
 - Cần ít nhất 2 Client để bắt đầu game
->>>>>>> 974cc30dec38f79a3475f13d4e9f9b4abda032f0
+
