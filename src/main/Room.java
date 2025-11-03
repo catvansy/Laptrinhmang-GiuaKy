@@ -1,7 +1,7 @@
 package main;
 
 public class Room {
-    private String name;
+    private final String name;
     private Game game;
     private ClientHandler host;
     private ClientHandler guest;

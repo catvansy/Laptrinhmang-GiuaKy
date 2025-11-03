@@ -16,12 +16,12 @@ javac main/TicTacToeServer.java main/TicTacToeClient.java
 
 3. Chạy Server:
 ```bash
-java main.TicTacToeServer
+cd d:\test\Laptrinhmang-GiuaKy-main\src; java main.TicTacToeClient
 ```
 
 4. Chạy Client (có thể chạy nhiều client):
 ```bash
-java main.TicTacToeClient
+cd d:\test\Laptrinhmang-GiuaKy-main\src; java main.TicTacToeClient
 ```
 
 ## Cách chơi

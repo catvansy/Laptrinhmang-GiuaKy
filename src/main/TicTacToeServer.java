@@ -54,8 +54,9 @@ public class TicTacToeServer {
     }
 
     public static void main(String[] args) {
+        ServerSocket serverSocket = null;
         try {
-            ServerSocket serverSocket = new ServerSocket(PORT);
+            serverSocket = new ServerSocket(PORT);
             System.out.println("Máy chủ đang chạy trên cổng " + PORT);
 
             while (true) {
@@ -68,6 +69,14 @@ public class TicTacToeServer {
             }
         } catch (IOException e) {
             System.err.println("Lỗi khởi tạo server: " + e.getMessage());
+        } finally {
+            if (serverSocket != null) {
+                try {
+                    serverSocket.close();
+                } catch (IOException e) {
+                    System.err.println("Lỗi khi đóng server socket: " + e.getMessage());
+                }
+            }
         }
     }
 
@@ -110,10 +119,10 @@ public class TicTacToeServer {
 }
 
 class Game {
-    private ClientHandler player1; // Luôn là X
-    private ClientHandler player2; // Luôn là O
+    private final ClientHandler player1; // Luôn là X
+    private final ClientHandler player2; // Luôn là O
     private ClientHandler currentPlayer; // Người chơi đang đến lượt
-    private String[] board;
+    private final String[] board;
     private boolean gameEnded;
 
     public Game(ClientHandler player1, ClientHandler player2) {

@@ -99,7 +99,6 @@ public class TicTacToeClient extends JFrame {
     private void startGame() {
         getContentPane().removeAll();
         setupGamePanel();
-        connectToServer();
         getContentPane().add(gamePanel);
         revalidate();
         repaint();
@@ -132,23 +131,7 @@ public class TicTacToeClient extends JFrame {
         gamePanel.add(infoPanel, BorderLayout.SOUTH);
     }
 
-    private void connectToServer() {
-        try {
-            socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
-            out = new PrintWriter(socket.getOutputStream(), true);
-            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-            // Bắt đầu luồng lắng nghe tin nhắn từ server
-            new Thread(this::listenForServerMessages).start();
-
-        } catch (IOException e) {
-            JOptionPane.showMessageDialog(this,
-                    "Không thể kết nối đến máy chủ!\nLỗi: " + e.getMessage(),
-                    "Lỗi Kết Nối",
-                    JOptionPane.ERROR_MESSAGE);
-            System.exit(1);
-        }
-    }
 
     private void listenForServerMessages() {
         try {
