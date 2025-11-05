@@ -1,66 +1,84 @@
-# Game Tic Tac Toe Multiplayer
+# Tic Tac Toe (Caro 3x3) – Multiplayer qua Socket
 
-Game Tic Tac Toe (Caro 3x3) sử dụng Java Socket với mô hình Multi Client-Server.
+Ứng dụng Java Swing chơi Caro 3x3 qua mô hình Client–Server (TCP). Hỗ trợ sảnh phòng, chat và gửi file giữa 2 người chơi trong cùng phòng.
 
-## Cách chạy chương trình
+## Yêu cầu
+- JDK 8+ (có `java` và `javac` trong PATH)
 
-1. Di chuyển vào thư mục src:
-```bash
-cd src
+## Chạy nhanh (Windows)
+Tại thư mục gốc dự án:
+
+1) Build:
+```bat
+build.bat
 ```
 
-2. Biên dịch các file Java:
-```bash
-javac main/TicTacToeServer.java main/TicTacToeClient.java
+2) Chạy server (một cửa sổ riêng):
+```bat
+run_server.bat
 ```
 
-3. Chạy Server:
-```bash
-java main.TicTacToeServer
+3) Chạy client (mỗi client một cửa sổ):
+```bat
+run_client.bat
 ```
 
-4. Chạy Client (có thể chạy nhiều client):
-```bash
-java main.TicTacToeClient
+4) Làm sạch (xóa thư mục `out` và mọi `.class` rời):
+```bat
+clean.bat
 ```
 
-## Cách chơi
+Ghi chú: Các script ưu tiên chạy từ `out` nếu đã build; nếu chưa build, client/server có thể chạy trực tiếp từ `src`.
 
-1. Khởi động Server trước
-2. Mở 2 cửa sổ Client để bắt đầu game
-3. Server sẽ tự động ghép cặp người chơi
-4. Người chơi X sẽ đi trước
-5. Click vào ô trống để đánh
-6. Thắng khi có 3 ký hiệu giống nhau thẳng hàng (ngang, dọc, chéo)
+### Chạy bằng double‑click (File Explorer)
+- Có thể nhấp đúp các file: `build.bat`, `run_server.bat`, `run_client.bat`.
+- Script sẽ tự vào đúng thư mục, kiểm tra `java` trong PATH, chọn classpath (`out`/`src`) và dừng màn hình nếu có lỗi (pause) để bạn xem thông báo.
+
+## Cách để chạy game
+1. Khởi động server trước với `run_server.bat`.
+2. Mở 2 client bằng `run_client.bat` (mỗi client một cửa sổ).
+3. Khi client khởi chạy, nhập:
+   - Nickname: tùy ý
+   - Địa chỉ server: `localhost` (cùng máy) hoặc IP LAN của máy chạy server
+   - Cổng: `5001`
+4. Ở client 1: chọn “Tạo phòng mới” và đặt tên phòng.
+5. Ở client 2: chọn phòng trong danh sách và “Vào phòng”. Trò chơi sẽ bắt đầu.
+6. Bấm vào ô trên bàn cờ để đánh. Kết thúc ván có thể chọn “Chơi lại”.
 
 ## Tính năng
+- Giao diện Swing 3x3 với trạng thái lượt đi rõ ràng.
+- Sảnh phòng: tạo phòng, liệt kê và tham gia phòng còn trống.
+- Chat thời gian thực giữa 2 người chơi trong phòng.
+- Gửi/nhận file (giới hạn 2 MB, xác nhận lưu file khi nhận).
+- Xử lý ngắt kết nối: tự động đưa người còn lại về sảnh.
+- Chơi lại sau khi kết thúc ván.
 
-- Giao diện đồ họa cho Client (Swing)
-- Hỗ trợ nhiều cặp người chơi cùng lúc
-- Tự động ghép cặp người chơi
-- Xử lý ngắt kết nối
-- Hiển thị trạng thái game
-- Tùy chọn chơi lại sau khi game kết thúc
+## Giao thức Client–Server (tóm tắt)
+Từ Server → Client:
+- `DANH_SACH_PHONG|room1|room2|...`
+- `BAT_DAU|X|O`: thông báo biểu tượng của người chơi (client tự nhận `X` hoặc `O` từ payload)
+- `LUOT_CUA_BAN`, `LUOT_DOI_THU`
+- `DANH|position|symbol`
+- `KET_THUC|X` | `KET_THUC|O` | `KET_THUC|HOA`
+- `DOI_THU_THOAT`
+- `CHAT|from|text`
+- `FILE|from|filename|base64`
 
-## Protocol giao tiếp Client-Server
+Từ Client → Server:
+- `NICK|nickname`: gửi nickname sau khi kết nối
+- `LAY_DANH_SACH_PHONG`
+- `TAO_PHONG|roomName`, `VAO_PHONG|roomName`
+- `DANH|position`
+- `CHOI_LAI`
+- `CHAT|text`
+- `FILE|filename|base64`
 
-### Từ Server đến Client:
-- `BAT_DAU|X` hoặc `BAT_DAU|O`: Bắt đầu game, chỉ định ký hiệu cho người chơi
-- `LUOT_CUA_BAN`: Đến lượt người chơi hiện tại
-- `LUOT_DOI_THU`: Đến lượt đối thủ
-- `DANH|position|symbol`: Nước đi mới (vị trí và ký hiệu)
-- `KET_THUC|result`: Kết thúc game (X_THANG, O_THANG, hoặc HOA)
-- `DOI_THU_THOAT`: Đối thủ đã ngắt kết nối
+## Cấu hình mạng
+- Server mặc định chạy cổng `5001`.
+- Chơi LAN: nhập IP máy chạy server; cần cho phép Java qua tường lửa cổng 5001.
 
-### Từ Client đến Server:
-- `DANH|position`: Gửi nước đi (vị trí 0-8)
-- `CHOI_LAI`: Yêu cầu chơi game mới
-
-## Lưu ý
-
-- Server chạy trên port 5001
-- Mặc định kết nối đến localhost
-- Cần chạy Server trước khi chạy Client
-- Cần ít nhất 2 Client để bắt đầu game
-- Cần ít nhất 2 Client để bắt đầu game
+## Khắc phục sự cố
+- Không kết nối được: kiểm tra server đã chạy, đúng IP/cổng, tường lửa không chặn.
+- Build lỗi với `*.java`: dùng `build.bat` (đã xử lý wildcard đúng cho Windows).
+- Không thấy cửa sổ mới: mở thủ công qua Cmd bằng các script trên hoặc chạy trực tiếp lệnh `java -cp out main.TicTacToeClient` sau khi build.
 
