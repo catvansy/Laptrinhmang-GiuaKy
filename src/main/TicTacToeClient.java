@@ -1,10 +1,12 @@
 package main;
 
 import javax.swing.*;
+import java.nio.file.Files;
 import java.awt.*;
 import java.awt.event.WindowEvent;
 import java.io.*;
 import java.net.*;
+import java.util.Base64;
 
 public class TicTacToeClient extends JFrame {
     private JButton[] buttons;
@@ -14,11 +16,19 @@ public class TicTacToeClient extends JFrame {
     private BufferedReader in;
     private String playerSymbol;
     private boolean myTurn;
-    private static final String SERVER_ADDRESS = "localhost";
-    private static final int SERVER_PORT = 5001;
+    private String serverAddress = "localhost";
+    private int serverPort = 5001;
+    private String nickname = null;
 
     private JPanel homePanel;
     private JPanel gamePanel;
+
+    // Chat / file UI components
+    private JTextArea chatArea;
+    private JTextField chatInput;
+    private JButton sendChatButton;
+    private JButton sendFileButton;
+    private static final long MAX_FILE_SIZE_BYTES = 2_000_000; // 2 MB limit
 
     public TicTacToeClient() {
         setTitle("Cờ Ca-rô");
@@ -124,11 +134,105 @@ public class TicTacToeClient extends JFrame {
         statusLabel = new JLabel("Đang chờ đối thủ...", SwingConstants.CENTER);
         statusLabel.setFont(new Font("Arial", Font.PLAIN, 20));
         statusLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        infoPanel.add(statusLabel, BorderLayout.CENTER);
+    infoPanel.add(statusLabel, BorderLayout.NORTH);
+
+    // Chat panel
+    JPanel chatPanel = new JPanel(new BorderLayout());
+    chatPanel.setBorder(BorderFactory.createTitledBorder("Chat & File"));
+    chatArea = new JTextArea(8, 30);
+    chatArea.setEditable(false);
+    chatArea.setLineWrap(true);
+    chatArea.setWrapStyleWord(true);
+    JScrollPane chatScroll = new JScrollPane(chatArea);
+
+    JPanel chatInputPanel = new JPanel(new BorderLayout());
+    chatInput = new JTextField();
+    sendChatButton = new JButton("Gửi");
+    sendFileButton = new JButton("Gửi file");
+    JLabel fileLimitLabel = new JLabel("Giới hạn file: 2 MB");
+    fileLimitLabel.setBorder(BorderFactory.createEmptyBorder(0,8,0,8));
+    JPanel chatButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+    chatButtons.add(sendFileButton);
+    chatButtons.add(sendChatButton);
+
+    chatInputPanel.add(fileLimitLabel, BorderLayout.WEST);
+    chatInputPanel.add(chatInput, BorderLayout.CENTER);
+    chatInputPanel.add(chatButtons, BorderLayout.EAST);
+
+    chatPanel.add(chatScroll, BorderLayout.CENTER);
+    chatPanel.add(chatInputPanel, BorderLayout.SOUTH);
+
+    infoPanel.add(chatPanel, BorderLayout.SOUTH);
+
+        // Wire chat and file actions
+        sendChatButton.addActionListener(e -> {
+            String text = chatInput.getText().trim();
+            if (!text.isEmpty() && out != null) {
+                out.println("CHAT|" + text);
+                chatArea.append("Bạn: " + text + "\n");
+                chatInput.setText("");
+            }
+        });
+
+        chatInput.addActionListener(e -> sendChatButton.doClick());
+
+        sendFileButton.addActionListener(e -> {
+            JFileChooser chooser = new JFileChooser();
+            int sel = chooser.showOpenDialog(this);
+            if (sel == JFileChooser.APPROVE_OPTION) {
+                File f = chooser.getSelectedFile();
+                long size = f.length();
+                if (size > MAX_FILE_SIZE_BYTES) {
+                    JOptionPane.showMessageDialog(this, "Không thể gửi file: kích thước vượt quá giới hạn " + (MAX_FILE_SIZE_BYTES/1_000_000.0) + " MB.", "File quá lớn", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                // Ask for confirmation with file size shown
+                double kb = size / 1024.0;
+                String sizeStr = kb >= 1024 ? String.format("%.2f MB", kb/1024.0) : String.format("%.1f KB", kb);
+                int confirm = JOptionPane.showConfirmDialog(this, "Gửi file '" + f.getName() + "' (" + sizeStr + ")?", "Xác nhận gửi file", JOptionPane.YES_NO_OPTION);
+                if (confirm != JOptionPane.YES_OPTION) return;
+
+                try {
+                    byte[] bytes = Files.readAllBytes(f.toPath());
+                    String b64 = Base64.getEncoder().encodeToString(bytes);
+                    if (out != null) {
+                        out.println("FILE|" + f.getName() + "|" + b64);
+                        chatArea.append("Bạn đã gửi file: " + f.getName() + "\n");
+                    }
+                } catch (IOException ex) {
+                    JOptionPane.showMessageDialog(this, "Lỗi gửi file: " + ex.getMessage());
+                }
+            }
+        });
 
         // Thêm các panel vào game panel
         gamePanel.add(boardPanel, BorderLayout.CENTER);
         gamePanel.add(infoPanel, BorderLayout.SOUTH);
+    }
+
+    private void promptServerInfo() {
+        // Ask for nickname first
+        String nick = JOptionPane.showInputDialog(this, "Nhập nickname của bạn:", "", JOptionPane.PLAIN_MESSAGE);
+        if (nick != null && !nick.trim().isEmpty()) {
+            nickname = nick.trim();
+        } else {
+            nickname = "Guest" + (int)(Math.random() * 1000);
+        }
+
+        String addr = JOptionPane.showInputDialog(this, "Nhập địa chỉ máy chủ (IP hoặc hostname):", serverAddress);
+        if (addr != null && !addr.trim().isEmpty()) {
+            serverAddress = addr.trim();
+        }
+
+        String portStr = JOptionPane.showInputDialog(this, "Nhập cổng máy chủ:", Integer.toString(serverPort));
+        if (portStr != null && !portStr.trim().isEmpty()) {
+            try {
+                serverPort = Integer.parseInt(portStr.trim());
+            } catch (NumberFormatException ignored) {
+                // keep default
+            }
+        }
     }
 
 
@@ -152,6 +256,46 @@ public class TicTacToeClient extends JFrame {
     }
 
     private void processServerMessage(String message) {
+        // Chat message format: CHAT|from|text
+        if (message.startsWith("CHAT|")) {
+            String[] parts = message.split("\\|", 3);
+            String from = parts.length > 1 ? parts[1] : "Server";
+            String text = parts.length > 2 ? parts[2] : "";
+            SwingUtilities.invokeLater(() -> {
+                chatArea.append(from + ": " + text + "\n");
+            });
+            return;
+        }
+
+        // File message format: FILE|from|filename|base64
+        if (message.startsWith("FILE|")) {
+            String[] parts = message.split("\\|", 4);
+            String from = parts.length > 1 ? parts[1] : "Server";
+            String filename = parts.length > 2 ? parts[2] : "file.received";
+            String base64 = parts.length > 3 ? parts[3] : "";
+
+            SwingUtilities.invokeLater(() -> {
+                chatArea.append(from + " gửi 1 file: " + filename + "\n");
+                int choice = JOptionPane.showConfirmDialog(this, "Bạn muốn lưu file '" + filename + "' không?", "Nhận file từ " + from, JOptionPane.YES_NO_OPTION);
+                if (choice == JOptionPane.YES_OPTION) {
+                    JFileChooser chooser = new JFileChooser();
+                    chooser.setSelectedFile(new File(filename));
+                    int sel = chooser.showSaveDialog(this);
+                    if (sel == JFileChooser.APPROVE_OPTION) {
+                        File saveTo = chooser.getSelectedFile();
+                        try (FileOutputStream fos = new FileOutputStream(saveTo)) {
+                            byte[] data = Base64.getDecoder().decode(base64);
+                            fos.write(data);
+                            JOptionPane.showMessageDialog(this, "Lưu file thành công: " + saveTo.getAbsolutePath());
+                        } catch (IOException e) {
+                            JOptionPane.showMessageDialog(this, "Lỗi khi lưu file: " + e.getMessage(), "Lỗi", JOptionPane.ERROR_MESSAGE);
+                        }
+                    }
+                }
+            });
+            return;
+        }
+
         if (message.startsWith("DANH_SACH_PHONG|")) {
             String[] rooms = message.substring("DANH_SACH_PHONG|".length()).split("\\|");
             SwingUtilities.invokeLater(() -> {
@@ -298,12 +442,19 @@ public class TicTacToeClient extends JFrame {
 
     private void connectToServerForRoomList() {
         try {
-            socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
+            // Ask user for server address/port before connecting
+            promptServerInfo();
+            socket = new Socket(serverAddress, serverPort);
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
             // Bắt đầu luồng lắng nghe tin nhắn từ server
             new Thread(this::listenForServerMessages).start();
+
+            // Send nickname to server if available
+            if (nickname != null && out != null) {
+                out.println("NICK|" + nickname);
+            }
 
             // Yêu cầu danh sách phòng
             out.println("LAY_DANH_SACH_PHONG");

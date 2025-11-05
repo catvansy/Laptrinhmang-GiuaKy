@@ -95,6 +95,12 @@ public class TicTacToeServer {
     }
 
     public static synchronized void handleClientMessage(ClientHandler client, String message) {
+        // Handle nickname registration
+        if (message.startsWith("NICK|")) {
+            String nick = message.split("\\|", 2)[1];
+            client.setNickname(nick);
+            return;
+        }
         if (message.startsWith("TAO_PHONG|")) {
             String roomName = message.split("\\|")[1];
             createRoom(client, roomName);
@@ -103,6 +109,51 @@ public class TicTacToeServer {
             joinRoom(client, roomName);
         } else if (message.equals("LAY_DANH_SACH_PHONG")) {
             broadcastRoomList();
+        } else if (message.startsWith("CHAT|")) {
+            // Forward chat to players in the same room (or broadcast if no room)
+            String text = message.substring("CHAT|".length());
+            Room room = client.getCurrentRoom();
+            if (room != null) {
+                ClientHandler h = room.getHost();
+                ClientHandler g = room.getGuest();
+                if (h != null && h != client) {
+                    h.sendMessage("CHAT|" + client.getDisplayName() + "|" + text);
+                }
+                if (g != null && g != client) {
+                    g.sendMessage("CHAT|" + client.getDisplayName() + "|" + text);
+                }
+            } else {
+                // broadcast to all clients in lobby
+                for (ClientHandler c : clients) {
+                    if (c != client) {
+                        c.sendMessage("CHAT|" + client.getDisplayName() + "|" + text);
+                    }
+                }
+            }
+        } else if (message.startsWith("FILE|")) {
+            // FILE|filename|base64
+            String[] parts = message.split("\\|", 3);
+            if (parts.length >= 3) {
+                String filename = parts[1];
+                String base64 = parts[2];
+                Room room = client.getCurrentRoom();
+                if (room != null) {
+                    ClientHandler h = room.getHost();
+                    ClientHandler g = room.getGuest();
+                    if (h != null && h != client) {
+                        h.sendMessage("FILE|" + client.getDisplayName() + "|" + filename + "|" + base64);
+                    }
+                    if (g != null && g != client) {
+                        g.sendMessage("FILE|" + client.getDisplayName() + "|" + filename + "|" + base64);
+                    }
+                } else {
+                    for (ClientHandler c : clients) {
+                        if (c != client) {
+                            c.sendMessage("FILE|" + client.getDisplayName() + "|" + filename + "|" + base64);
+                        }
+                    }
+                }
+            }
         } else if (message.startsWith("DANH|")) {
             Room room = client.getCurrentRoom();
             if (room != null && room.getGame() != null) {
@@ -272,6 +323,7 @@ class ClientHandler {
     private PrintWriter out;
     private BufferedReader in;
     private Room currentRoom;
+    private String nickname;
 
     public ClientHandler(Socket socket) {
         this.socket = socket;
@@ -296,6 +348,19 @@ class ClientHandler {
 
     public Room getCurrentRoom() {
         return currentRoom;
+    }
+
+    public String getDisplayName() {
+        if (nickname != null && !nickname.trim().isEmpty()) return nickname;
+        try {
+            return socket.getInetAddress().getHostAddress() + ":" + socket.getPort();
+        } catch (Exception e) {
+            return "unknown";
+        }
+    }
+
+    public void setNickname(String nick) {
+        this.nickname = nick;
     }
 
     public void sendMessage(String message) {

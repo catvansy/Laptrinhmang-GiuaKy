@@ -56,6 +56,15 @@ public class Room {
         return game;
     }
 
+    // Expose host/guest for server-side forwarding (chat/file)
+    public ClientHandler getHost() {
+        return host;
+    }
+
+    public ClientHandler getGuest() {
+        return guest;
+    }
+
     public void resetGame() {
         if (game != null) {
             game.resetGame();
