@@ -57,27 +57,32 @@ public class TicTacToeClient extends JFrame {
         // Panel danh sách phòng
         roomListPanel = new JPanel(new BorderLayout());
         roomListPanel.setBorder(BorderFactory.createTitledBorder("Danh sách phòng"));
-        
+        // Top-right search by Room ID
+        JPanel roomTopBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        JButton findRoomButton = new JButton("Tìm phòng");
+        roomTopBar.add(findRoomButton);
+        roomListPanel.add(roomTopBar, BorderLayout.NORTH);
+
         roomListModel = new DefaultListModel<>();
         roomList = new JList<>(roomListModel);
         roomList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         roomList.setFont(new Font("Arial", Font.PLAIN, 16));
         JScrollPane scrollPane = new JScrollPane(roomList);
         scrollPane.setPreferredSize(new Dimension(300, 200));
-        
+
         // Panel nút điều khiển
         JPanel buttonPanel = new JPanel();
         buttonPanel.setLayout(new FlowLayout());
 
         JButton createRoomButton = new JButton("Tạo phòng mới");
         createRoomButton.setFont(new Font("Arial", Font.BOLD, 16));
-        
+
         JButton joinRoomButton = new JButton("Vào phòng");
         joinRoomButton.setFont(new Font("Arial", Font.BOLD, 16));
-        
+
         JButton refreshButton = new JButton("Làm mới");
         refreshButton.setFont(new Font("Arial", Font.BOLD, 16));
-        
+
         JButton exitButton = new JButton("Thoát");
         exitButton.setFont(new Font("Arial", Font.BOLD, 16));
 
@@ -96,12 +101,13 @@ public class TicTacToeClient extends JFrame {
         // Thêm sự kiện cho các nút
         createRoomButton.addActionListener(e -> createRoom());
         joinRoomButton.addActionListener(e -> joinSelectedRoom());
+        findRoomButton.addActionListener(e -> findRoomById());
         refreshButton.addActionListener(e -> refreshRoomList());
         exitButton.addActionListener(e -> System.exit(0));
 
         // Hiển thị màn hình chính
         getContentPane().add(homePanel);
-        
+
         // Kết nối đến server để lấy danh sách phòng
         connectToServerForRoomList();
     }
@@ -134,35 +140,35 @@ public class TicTacToeClient extends JFrame {
         statusLabel = new JLabel("Đang chờ đối thủ...", SwingConstants.CENTER);
         statusLabel.setFont(new Font("Arial", Font.PLAIN, 20));
         statusLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-    infoPanel.add(statusLabel, BorderLayout.NORTH);
+        infoPanel.add(statusLabel, BorderLayout.NORTH);
 
-    // Chat panel
-    JPanel chatPanel = new JPanel(new BorderLayout());
-    chatPanel.setBorder(BorderFactory.createTitledBorder("Chat & File"));
-    chatArea = new JTextArea(8, 30);
-    chatArea.setEditable(false);
-    chatArea.setLineWrap(true);
-    chatArea.setWrapStyleWord(true);
-    JScrollPane chatScroll = new JScrollPane(chatArea);
+        // Chat panel
+        JPanel chatPanel = new JPanel(new BorderLayout());
+        chatPanel.setBorder(BorderFactory.createTitledBorder("Chat & File"));
+        chatArea = new JTextArea(8, 30);
+        chatArea.setEditable(false);
+        chatArea.setLineWrap(true);
+        chatArea.setWrapStyleWord(true);
+        JScrollPane chatScroll = new JScrollPane(chatArea);
 
-    JPanel chatInputPanel = new JPanel(new BorderLayout());
-    chatInput = new JTextField();
-    sendChatButton = new JButton("Gửi");
-    sendFileButton = new JButton("Gửi file");
-    JLabel fileLimitLabel = new JLabel("Giới hạn file: 2 MB");
-    fileLimitLabel.setBorder(BorderFactory.createEmptyBorder(0,8,0,8));
-    JPanel chatButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-    chatButtons.add(sendFileButton);
-    chatButtons.add(sendChatButton);
+        JPanel chatInputPanel = new JPanel(new BorderLayout());
+        chatInput = new JTextField();
+        sendChatButton = new JButton("Gửi");
+        sendFileButton = new JButton("Gửi file");
+        JLabel fileLimitLabel = new JLabel("Giới hạn file: 2 MB");
+        fileLimitLabel.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 8));
+        JPanel chatButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        chatButtons.add(sendFileButton);
+        chatButtons.add(sendChatButton);
 
-    chatInputPanel.add(fileLimitLabel, BorderLayout.WEST);
-    chatInputPanel.add(chatInput, BorderLayout.CENTER);
-    chatInputPanel.add(chatButtons, BorderLayout.EAST);
+        chatInputPanel.add(fileLimitLabel, BorderLayout.WEST);
+        chatInputPanel.add(chatInput, BorderLayout.CENTER);
+        chatInputPanel.add(chatButtons, BorderLayout.EAST);
 
-    chatPanel.add(chatScroll, BorderLayout.CENTER);
-    chatPanel.add(chatInputPanel, BorderLayout.SOUTH);
+        chatPanel.add(chatScroll, BorderLayout.CENTER);
+        chatPanel.add(chatInputPanel, BorderLayout.SOUTH);
 
-    infoPanel.add(chatPanel, BorderLayout.SOUTH);
+        infoPanel.add(chatPanel, BorderLayout.SOUTH);
 
         // Wire chat and file actions
         sendChatButton.addActionListener(e -> {
@@ -183,15 +189,20 @@ public class TicTacToeClient extends JFrame {
                 File f = chooser.getSelectedFile();
                 long size = f.length();
                 if (size > MAX_FILE_SIZE_BYTES) {
-                    JOptionPane.showMessageDialog(this, "Không thể gửi file: kích thước vượt quá giới hạn " + (MAX_FILE_SIZE_BYTES/1_000_000.0) + " MB.", "File quá lớn", JOptionPane.ERROR_MESSAGE);
+                    JOptionPane.showMessageDialog(
+                            this, "Không thể gửi file: kích thước vượt quá giới hạn "
+                                    + (MAX_FILE_SIZE_BYTES / 1_000_000.0) + " MB.",
+                            "File quá lớn", JOptionPane.ERROR_MESSAGE);
                     return;
                 }
 
                 // Ask for confirmation with file size shown
                 double kb = size / 1024.0;
-                String sizeStr = kb >= 1024 ? String.format("%.2f MB", kb/1024.0) : String.format("%.1f KB", kb);
-                int confirm = JOptionPane.showConfirmDialog(this, "Gửi file '" + f.getName() + "' (" + sizeStr + ")?", "Xác nhận gửi file", JOptionPane.YES_NO_OPTION);
-                if (confirm != JOptionPane.YES_OPTION) return;
+                String sizeStr = kb >= 1024 ? String.format("%.2f MB", kb / 1024.0) : String.format("%.1f KB", kb);
+                int confirm = JOptionPane.showConfirmDialog(this, "Gửi file '" + f.getName() + "' (" + sizeStr + ")?",
+                        "Xác nhận gửi file", JOptionPane.YES_NO_OPTION);
+                if (confirm != JOptionPane.YES_OPTION)
+                    return;
 
                 try {
                     byte[] bytes = Files.readAllBytes(f.toPath());
@@ -217,7 +228,7 @@ public class TicTacToeClient extends JFrame {
         if (nick != null && !nick.trim().isEmpty()) {
             nickname = nick.trim();
         } else {
-            nickname = "Guest" + (int)(Math.random() * 1000);
+            nickname = "Guest" + (int) (Math.random() * 1000);
         }
 
         String addr = JOptionPane.showInputDialog(this, "Nhập địa chỉ máy chủ (IP hoặc hostname):", serverAddress);
@@ -234,8 +245,6 @@ public class TicTacToeClient extends JFrame {
             }
         }
     }
-
-
 
     private void listenForServerMessages() {
         try {
@@ -276,7 +285,8 @@ public class TicTacToeClient extends JFrame {
 
             SwingUtilities.invokeLater(() -> {
                 chatArea.append(from + " gửi 1 file: " + filename + "\n");
-                int choice = JOptionPane.showConfirmDialog(this, "Bạn muốn lưu file '" + filename + "' không?", "Nhận file từ " + from, JOptionPane.YES_NO_OPTION);
+                int choice = JOptionPane.showConfirmDialog(this, "Bạn muốn lưu file '" + filename + "' không?",
+                        "Nhận file từ " + from, JOptionPane.YES_NO_OPTION);
                 if (choice == JOptionPane.YES_OPTION) {
                     JFileChooser chooser = new JFileChooser();
                     chooser.setSelectedFile(new File(filename));
@@ -288,7 +298,8 @@ public class TicTacToeClient extends JFrame {
                             fos.write(data);
                             JOptionPane.showMessageDialog(this, "Lưu file thành công: " + saveTo.getAbsolutePath());
                         } catch (IOException e) {
-                            JOptionPane.showMessageDialog(this, "Lỗi khi lưu file: " + e.getMessage(), "Lỗi", JOptionPane.ERROR_MESSAGE);
+                            JOptionPane.showMessageDialog(this, "Lỗi khi lưu file: " + e.getMessage(), "Lỗi",
+                                    JOptionPane.ERROR_MESSAGE);
                         }
                     }
                 }
@@ -300,9 +311,17 @@ public class TicTacToeClient extends JFrame {
             String[] rooms = message.substring("DANH_SACH_PHONG|".length()).split("\\|");
             SwingUtilities.invokeLater(() -> {
                 roomListModel.clear();
-                for (String room : rooms) {
-                    if (!room.trim().isEmpty()) {
-                        roomListModel.addElement(room);
+                for (String item : rooms) {
+                    if (!item.trim().isEmpty()) {
+                        // item format: id,name
+                        String[] parts = item.split(",", 2);
+                        if (parts.length == 2) {
+                            String id = parts[0];
+                            String name = parts[1];
+                            roomListModel.addElement(name + " (ID: " + id + ")");
+                        } else {
+                            roomListModel.addElement(item);
+                        }
                     }
                 }
             });
@@ -339,9 +358,9 @@ public class TicTacToeClient extends JFrame {
             String errorMsg = message.split("\\|")[1];
             SwingUtilities.invokeLater(() -> {
                 JOptionPane.showMessageDialog(this,
-                    errorMsg,
-                    "Lỗi",
-                    JOptionPane.ERROR_MESSAGE);
+                        errorMsg,
+                        "Lỗi",
+                        JOptionPane.ERROR_MESSAGE);
             });
         }
     }
@@ -393,10 +412,10 @@ public class TicTacToeClient extends JFrame {
         // Reset trạng thái
         playerSymbol = null;
         myTurn = false;
-        
+
         // Đóng kết nối hiện tại
         closeConnection();
-        
+
         // Quay về trang chủ
         getContentPane().removeAll();
         getContentPane().add(homePanel);
@@ -469,11 +488,11 @@ public class TicTacToeClient extends JFrame {
     }
 
     private void createRoom() {
-        String roomName = JOptionPane.showInputDialog(this, 
-            "Nhập tên phòng:", 
-            "Tạo phòng mới", 
-            JOptionPane.PLAIN_MESSAGE);
-        
+        String roomName = JOptionPane.showInputDialog(this,
+                "Nhập tên phòng:",
+                "Tạo phòng mới",
+                JOptionPane.PLAIN_MESSAGE);
+
         if (roomName != null && !roomName.trim().isEmpty()) {
             out.println("TAO_PHONG|" + roomName.trim());
             joinGame();
@@ -483,14 +502,40 @@ public class TicTacToeClient extends JFrame {
     private void joinSelectedRoom() {
         String selectedRoom = roomList.getSelectedValue();
         if (selectedRoom != null) {
-            out.println("VAO_PHONG|" + selectedRoom);
+            // selectedRoom may be in format: "name (ID: xxxxxx)"; extract name before "
+            // (ID:"
+            String roomName = selectedRoom;
+            int idx = selectedRoom.indexOf(" (ID:");
+            if (idx > 0) {
+                roomName = selectedRoom.substring(0, idx);
+            }
+            out.println("VAO_PHONG|" + roomName);
             joinGame();
         } else {
             JOptionPane.showMessageDialog(this,
-                "Vui lòng chọn một phòng để vào!",
-                "Thông báo",
-                JOptionPane.INFORMATION_MESSAGE);
+                    "Vui lòng chọn một phòng để vào!",
+                    "Thông báo",
+                    JOptionPane.INFORMATION_MESSAGE);
         }
+    }
+
+    private void findRoomById() {
+        String id = JOptionPane.showInputDialog(this,
+                "Nhập ID phòng (6 chữ số):",
+                "Tìm phòng",
+                JOptionPane.PLAIN_MESSAGE);
+        if (id == null)
+            return;
+        id = id.trim();
+        if (!id.matches("\\d{6}")) {
+            JOptionPane.showMessageDialog(this,
+                    "ID không hợp lệ. Vui lòng nhập 6 chữ số.",
+                    "Lỗi",
+                    JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        out.println("VAO_PHONG_ID|" + id);
+        joinGame();
     }
 
     private void refreshRoomList() {
@@ -509,7 +554,8 @@ public class TicTacToeClient extends JFrame {
         try {
             // Set Look and Feel
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (UnsupportedLookAndFeelException | ClassNotFoundException | InstantiationException | IllegalAccessException e) {
+        } catch (UnsupportedLookAndFeelException | ClassNotFoundException | InstantiationException
+                | IllegalAccessException e) {
             System.err.println("Không thể thiết lập giao diện: " + e.getMessage());
         }
 

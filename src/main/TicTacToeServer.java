@@ -7,14 +7,15 @@ import java.util.*;
 public class TicTacToeServer {
     private static final int PORT = 5001;
     private static ArrayList<ClientHandler> clients = new ArrayList<>();
-    private static Map<String, Room> rooms = new HashMap<>();
+    private static Map<String, Room> rooms = new HashMap<>(); // key: roomName
+    private static Map<String, Room> roomsById = new HashMap<>(); // key: roomId
 
     private static void broadcastRoomList() {
         StringBuilder roomList = new StringBuilder("DANH_SACH_PHONG");
-        for (String roomName : rooms.keySet()) {
-            Room room = rooms.get(roomName);
+        for (Room room : roomsById.values()) {
             if (!room.isFull()) {
-                roomList.append("|").append(roomName);
+                // send as id,name to allow clients to display and search by id
+                roomList.append("|").append(room.getId()).append(",").append(room.getName());
             }
         }
         String message = roomList.toString();
@@ -23,14 +24,26 @@ public class TicTacToeServer {
         }
     }
 
+    private static String generateRoomId() {
+        Random random = new Random();
+        String id;
+        do {
+            int n = 100000 + random.nextInt(900000); // 6 digits
+            id = String.valueOf(n);
+        } while (roomsById.containsKey(id));
+        return id;
+    }
+
     private static synchronized void createRoom(ClientHandler client, String roomName) {
         if (rooms.containsKey(roomName)) {
             client.sendMessage("LOI|Phòng đã tồn tại");
             return;
         }
 
-        Room room = new Room(roomName, client);
+        String roomId = generateRoomId();
+        Room room = new Room(roomId, roomName, client);
         rooms.put(roomName, room);
+        roomsById.put(roomId, room);
         client.setCurrentRoom(room);
         client.sendMessage("CHO_DOI_THU");
         broadcastRoomList();
@@ -38,6 +51,23 @@ public class TicTacToeServer {
 
     private static synchronized void joinRoom(ClientHandler client, String roomName) {
         Room room = rooms.get(roomName);
+        if (room == null) {
+            client.sendMessage("LOI|Phòng không tồn tại");
+            return;
+        }
+
+        if (room.isFull()) {
+            client.sendMessage("LOI|Phòng đã đầy");
+            return;
+        }
+
+        room.addPlayer(client);
+        client.setCurrentRoom(room);
+        broadcastRoomList();
+    }
+
+    private static synchronized void joinRoomById(ClientHandler client, String roomId) {
+        Room room = roomsById.get(roomId);
         if (room == null) {
             client.sendMessage("LOI|Phòng không tồn tại");
             return;
@@ -86,6 +116,7 @@ public class TicTacToeServer {
             room.removePlayer(client);
             if (room.isEmpty()) {
                 rooms.remove(room.getName());
+                roomsById.remove(room.getId());
             }
             broadcastRoomList();
         }
@@ -107,6 +138,9 @@ public class TicTacToeServer {
         } else if (message.startsWith("VAO_PHONG|")) {
             String roomName = message.split("\\|")[1];
             joinRoom(client, roomName);
+        } else if (message.startsWith("VAO_PHONG_ID|")) {
+            String roomId = message.split("\\|")[1];
+            joinRoomById(client, roomId);
         } else if (message.equals("LAY_DANH_SACH_PHONG")) {
             broadcastRoomList();
         } else if (message.startsWith("CHAT|")) {
@@ -351,7 +385,8 @@ class ClientHandler {
     }
 
     public String getDisplayName() {
-        if (nickname != null && !nickname.trim().isEmpty()) return nickname;
+        if (nickname != null && !nickname.trim().isEmpty())
+            return nickname;
         try {
             return socket.getInetAddress().getHostAddress() + ":" + socket.getPort();
         } catch (Exception e) {

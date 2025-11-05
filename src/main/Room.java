@@ -1,18 +1,24 @@
 package main;
 
 public class Room {
+    private final String id; // 6-digit numeric ID
     private final String name;
     private Game game;
     private ClientHandler host;
     private ClientHandler guest;
 
-    public Room(String name, ClientHandler host) {
+    public Room(String id, String name, ClientHandler host) {
+        this.id = id;
         this.name = name;
         this.host = host;
     }
 
     public String getName() {
         return name;
+    }
+
+    public String getId() {
+        return id;
     }
 
     public boolean isFull() {
