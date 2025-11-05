@@ -3,9 +3,14 @@
 
 # Ignore log files
 *.log
+hs_err_pid*.log
 
 # Ignore temporary files
 *.tmp
+*.bak
+*.orig
+*.swp
+*.swo
 
 # Ignore compiled output directories
 /bin/
@@ -16,6 +21,14 @@
 .vscode/
 .idea/
 *.iml
+.classpath
+.project
+.settings/
+
+# Ignore packaged artifacts
+*.jar
+*.war
+*.ear
 
 # Ignore OS files
 .DS_Store
