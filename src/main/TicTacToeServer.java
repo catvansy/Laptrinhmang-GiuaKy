@@ -7,15 +7,14 @@ import java.util.*;
 public class TicTacToeServer {
     private static final int PORT = 5001;
     private static ArrayList<ClientHandler> clients = new ArrayList<>();
-    private static Map<String, Room> rooms = new HashMap<>(); // key: roomName
-    private static Map<String, Room> roomsById = new HashMap<>(); // key: roomId
+    private static Map<String, Room> rooms = new HashMap<>();
 
     private static void broadcastRoomList() {
         StringBuilder roomList = new StringBuilder("DANH_SACH_PHONG");
-        for (Room room : roomsById.values()) {
+        for (String roomName : rooms.keySet()) {
+            Room room = rooms.get(roomName);
             if (!room.isFull()) {
-                // send as id,name to allow clients to display and search by id
-                roomList.append("|").append(room.getId()).append(",").append(room.getName());
+                roomList.append("|").append(roomName);
             }
         }
         String message = roomList.toString();
@@ -24,26 +23,14 @@ public class TicTacToeServer {
         }
     }
 
-    private static String generateRoomId() {
-        Random random = new Random();
-        String id;
-        do {
-            int n = 100000 + random.nextInt(900000); // 6 digits
-            id = String.valueOf(n);
-        } while (roomsById.containsKey(id));
-        return id;
-    }
-
     private static synchronized void createRoom(ClientHandler client, String roomName) {
         if (rooms.containsKey(roomName)) {
-            client.sendMessage("LOI|Phòng đã tồn tại");
+            client.sendMessage("LOI|Room already exists");
             return;
         }
 
-        String roomId = generateRoomId();
-        Room room = new Room(roomId, roomName, client);
+        Room room = new Room(roomName, client);
         rooms.put(roomName, room);
-        roomsById.put(roomId, room);
         client.setCurrentRoom(room);
         client.sendMessage("CHO_DOI_THU");
         broadcastRoomList();
@@ -52,29 +39,12 @@ public class TicTacToeServer {
     private static synchronized void joinRoom(ClientHandler client, String roomName) {
         Room room = rooms.get(roomName);
         if (room == null) {
-            client.sendMessage("LOI|Phòng không tồn tại");
+            client.sendMessage("LOI|Room does not exist");
             return;
         }
 
         if (room.isFull()) {
-            client.sendMessage("LOI|Phòng đã đầy");
-            return;
-        }
-
-        room.addPlayer(client);
-        client.setCurrentRoom(room);
-        broadcastRoomList();
-    }
-
-    private static synchronized void joinRoomById(ClientHandler client, String roomId) {
-        Room room = roomsById.get(roomId);
-        if (room == null) {
-            client.sendMessage("LOI|Phòng không tồn tại");
-            return;
-        }
-
-        if (room.isFull()) {
-            client.sendMessage("LOI|Phòng đã đầy");
+            client.sendMessage("LOI|Room is full");
             return;
         }
 
@@ -87,107 +57,52 @@ public class TicTacToeServer {
         ServerSocket serverSocket = null;
         try {
             serverSocket = new ServerSocket(PORT);
-            System.out.println("Máy chủ đang chạy trên cổng " + PORT);
+            System.out.println("Server is running on port " + PORT);
 
             while (true) {
                 Socket clientSocket = serverSocket.accept();
-                System.out.println("Client mới kết nối: " + clientSocket.getInetAddress());
+                System.out.println("New client connected: " + clientSocket.getInetAddress());
 
                 ClientHandler clientHandler = new ClientHandler(clientSocket);
                 clients.add(clientHandler);
                 broadcastRoomList();
             }
         } catch (IOException e) {
-            System.err.println("Lỗi khởi tạo server: " + e.getMessage());
+            System.err.println("Error initializing server: " + e.getMessage());
         } finally {
             if (serverSocket != null) {
                 try {
                     serverSocket.close();
                 } catch (IOException e) {
-                    System.err.println("Lỗi khi đóng server socket: " + e.getMessage());
+                    System.err.println("Error closing server socket: " + e.getMessage());
                 }
             }
         }
     }
 
-    // Remove client khỏi danh sách và xử lý khi disconnect
+    // Remove client from list and handle disconnection
     public static synchronized void removeClient(ClientHandler client, Room room) {
         if (room != null) {
             room.removePlayer(client);
             if (room.isEmpty()) {
                 rooms.remove(room.getName());
-                roomsById.remove(room.getId());
             }
             broadcastRoomList();
         }
 
         clients.remove(client);
-        System.out.println("Client đã ngắt kết nối. Số client còn lại: " + clients.size());
+        System.out.println("Client disconnected. Remaining clients: " + clients.size());
     }
 
     public static synchronized void handleClientMessage(ClientHandler client, String message) {
-        // Handle nickname registration
-        if (message.startsWith("NICK|")) {
-            String nick = message.split("\\|", 2)[1];
-            client.setNickname(nick);
-            return;
-        }
         if (message.startsWith("TAO_PHONG|")) {
             String roomName = message.split("\\|")[1];
             createRoom(client, roomName);
         } else if (message.startsWith("VAO_PHONG|")) {
             String roomName = message.split("\\|")[1];
             joinRoom(client, roomName);
-        } else if (message.startsWith("VAO_PHONG_ID|")) {
-            String roomId = message.split("\\|")[1];
-            joinRoomById(client, roomId);
         } else if (message.equals("LAY_DANH_SACH_PHONG")) {
             broadcastRoomList();
-        } else if (message.startsWith("CHAT|")) {
-            // Forward chat to players in the same room (or broadcast if no room)
-            String text = message.substring("CHAT|".length());
-            Room room = client.getCurrentRoom();
-            if (room != null) {
-                ClientHandler h = room.getHost();
-                ClientHandler g = room.getGuest();
-                if (h != null && h != client) {
-                    h.sendMessage("CHAT|" + client.getDisplayName() + "|" + text);
-                }
-                if (g != null && g != client) {
-                    g.sendMessage("CHAT|" + client.getDisplayName() + "|" + text);
-                }
-            } else {
-                // broadcast to all clients in lobby
-                for (ClientHandler c : clients) {
-                    if (c != client) {
-                        c.sendMessage("CHAT|" + client.getDisplayName() + "|" + text);
-                    }
-                }
-            }
-        } else if (message.startsWith("FILE|")) {
-            // FILE|filename|base64
-            String[] parts = message.split("\\|", 3);
-            if (parts.length >= 3) {
-                String filename = parts[1];
-                String base64 = parts[2];
-                Room room = client.getCurrentRoom();
-                if (room != null) {
-                    ClientHandler h = room.getHost();
-                    ClientHandler g = room.getGuest();
-                    if (h != null && h != client) {
-                        h.sendMessage("FILE|" + client.getDisplayName() + "|" + filename + "|" + base64);
-                    }
-                    if (g != null && g != client) {
-                        g.sendMessage("FILE|" + client.getDisplayName() + "|" + filename + "|" + base64);
-                    }
-                } else {
-                    for (ClientHandler c : clients) {
-                        if (c != client) {
-                            c.sendMessage("FILE|" + client.getDisplayName() + "|" + filename + "|" + base64);
-                        }
-                    }
-                }
-            }
         } else if (message.startsWith("DANH|")) {
             Room room = client.getCurrentRoom();
             if (room != null && room.getGame() != null) {
@@ -204,9 +119,9 @@ public class TicTacToeServer {
 }
 
 class Game {
-    private final ClientHandler player1; // Luôn là X
-    private final ClientHandler player2; // Luôn là O
-    private ClientHandler currentPlayer; // Người chơi đang đến lượt
+    private final ClientHandler player1; // Always X
+    private final ClientHandler player2; // Always O
+    private ClientHandler currentPlayer; // Current player's turn
     private final String[] board;
     private boolean gameEnded;
 
@@ -227,24 +142,24 @@ class Game {
     }
 
     public void start() {
-        // Player1 luôn là X, Player2 luôn là O
+        // Player1 is always X, Player2 is always O
         player1.sendMessage("BAT_DAU|X");
         player2.sendMessage("BAT_DAU|O");
 
-        // Random chọn X hay O đi trước (dùng nanoTime để đảm bảo ngẫu nhiên)
+        // Randomly choose whether X or O goes first (using nanoTime to ensure randomness)
         Random random = new Random(System.nanoTime());
         boolean xGoesFirst = random.nextBoolean();
 
         if (xGoesFirst) {
-            // X đi trước (player1)
+            // X goes first (player1)
             currentPlayer = player1;
-            System.out.println("Game bắt đầu: X (player1) đi trước");
+            System.out.println("Game started: X (player1) goes first");
             player1.sendMessage("LUOT_CUA_BAN");
             player2.sendMessage("LUOT_DOI_THU");
         } else {
-            // O đi trước (player2)
+            // O goes first (player2)
             currentPlayer = player2;
-            System.out.println("Game bắt đầu: O (player2) đi trước");
+            System.out.println("Game started: O (player2) goes first");
             player2.sendMessage("LUOT_CUA_BAN");
             player1.sendMessage("LUOT_DOI_THU");
         }
@@ -255,16 +170,16 @@ class Game {
             return;
         }
 
-        // Kiểm tra xem có phải lượt của người chơi này không
+        // Check if it's this player's turn
         if (player != currentPlayer) {
             return;
         }
 
-        // Player1 luôn là X, Player2 luôn là O
+        // Player1 is always X, Player2 is always O
         String symbol = (player == player1) ? "X" : "O";
         board[position] = symbol;
 
-        // Thông báo nước đi cho cả hai người chơi
+        // Notify both players of the move
         broadcastMove(position, symbol);
 
         if (checkWin(symbol)) {
@@ -272,7 +187,7 @@ class Game {
         } else if (isBoardFull()) {
             endGame("HOA");
         } else {
-            // Đổi lượt
+            // Switch turns
             if (currentPlayer == player1) {
                 currentPlayer = player2;
                 player1.sendMessage("LUOT_DOI_THU");
@@ -292,21 +207,21 @@ class Game {
     }
 
     private boolean checkWin(String symbol) {
-        // Kiểm tra hàng ngang
+        // Check horizontal rows
         for (int i = 0; i < 9; i += 3) {
             if (board[i].equals(symbol) && board[i + 1].equals(symbol) && board[i + 2].equals(symbol)) {
                 return true;
             }
         }
 
-        // Kiểm tra hàng dọc
+        // Check vertical columns
         for (int i = 0; i < 3; i++) {
             if (board[i].equals(symbol) && board[i + 3].equals(symbol) && board[i + 6].equals(symbol)) {
                 return true;
             }
         }
 
-        // Kiểm tra đường chéo
+        // Check diagonals
         if (board[0].equals(symbol) && board[4].equals(symbol) && board[8].equals(symbol)) {
             return true;
         }
@@ -334,10 +249,10 @@ class Game {
     }
 
     public void handlePlayerDisconnect(ClientHandler player) {
-        System.out.println("handlePlayerDisconnect được gọi cho player: " + player);
+        System.out.println("handlePlayerDisconnect called for player: " + player);
         if (!gameEnded) {
             gameEnded = true;
-            // Thông báo cho người chơi còn lại
+            // Notify the remaining player
             ClientHandler otherPlayer = (player == player1) ? player2 : player1;
             if (otherPlayer != null) {
                 otherPlayer.sendMessage("DOI_THU_THOAT");
@@ -357,7 +272,6 @@ class ClientHandler {
     private PrintWriter out;
     private BufferedReader in;
     private Room currentRoom;
-    private String nickname;
 
     public ClientHandler(Socket socket) {
         this.socket = socket;
@@ -366,7 +280,7 @@ class ClientHandler {
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             startMessageHandler();
         } catch (IOException e) {
-            System.err.println("Lỗi khởi tạo client handler: " + e.getMessage());
+            System.err.println("Error initializing client handler: " + e.getMessage());
         }
     }
 
@@ -384,30 +298,16 @@ class ClientHandler {
         return currentRoom;
     }
 
-    public String getDisplayName() {
-        if (nickname != null && !nickname.trim().isEmpty())
-            return nickname;
-        try {
-            return socket.getInetAddress().getHostAddress() + ":" + socket.getPort();
-        } catch (Exception e) {
-            return "unknown";
-        }
-    }
-
-    public void setNickname(String nick) {
-        this.nickname = nick;
-    }
-
     public void sendMessage(String message) {
         try {
             if (out != null && !socket.isClosed() && !socket.isOutputShutdown()) {
                 out.println(message);
-                out.flush(); // Đảm bảo message được gửi ngay
+                out.flush(); // Ensure message is sent immediately
             } else {
-                System.err.println("Không thể gửi message - socket đã đóng hoặc output đã shutdown");
+                System.err.println("Cannot send message - socket is closed or output is shutdown");
             }
         } catch (Exception e) {
-            System.err.println("Lỗi khi gửi message: " + e.getMessage());
+            System.err.println("Error sending message: " + e.getMessage());
         }
     }
 
@@ -422,7 +322,7 @@ class ClientHandler {
                 TicTacToeServer.handleClientMessage(this, message);
             }
         } catch (IOException e) {
-            System.out.println("Client ngắt kết nối: " + socket.getInetAddress());
+            System.out.println("Client disconnected: " + socket.getInetAddress());
             Room room = getCurrentRoom();
             if (room != null) {
                 TicTacToeServer.removeClient(this, room);
@@ -435,7 +335,7 @@ class ClientHandler {
                     socket.close();
                 }
             } catch (IOException e) {
-                System.err.println("Lỗi khi đóng socket: " + e.getMessage());
+                System.err.println("Error closing socket: " + e.getMessage());
             }
         }
     }

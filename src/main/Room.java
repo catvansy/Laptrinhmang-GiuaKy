@@ -1,24 +1,18 @@
 package main;
 
 public class Room {
-    private final String id; // 6-digit numeric ID
     private final String name;
     private Game game;
     private ClientHandler host;
     private ClientHandler guest;
 
-    public Room(String id, String name, ClientHandler host) {
-        this.id = id;
+    public Room(String name, ClientHandler host) {
         this.name = name;
         this.host = host;
     }
 
     public String getName() {
         return name;
-    }
-
-    public String getId() {
-        return id;
     }
 
     public boolean isFull() {
@@ -60,15 +54,6 @@ public class Room {
 
     public Game getGame() {
         return game;
-    }
-
-    // Expose host/guest for server-side forwarding (chat/file)
-    public ClientHandler getHost() {
-        return host;
-    }
-
-    public ClientHandler getGuest() {
-        return guest;
     }
 
     public void resetGame() {
