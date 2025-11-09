@@ -21,7 +21,7 @@ public class TicTacToeClient extends JFrame {
     private JPanel gamePanel;
 
     public TicTacToeClient() {
-        setTitle("Tic Tac Toe");
+        setTitle("Cờ Ca-rô");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setupHomeScreen();
         setSize(400, 450);
@@ -38,15 +38,15 @@ public class TicTacToeClient extends JFrame {
         homePanel.setLayout(new BorderLayout());
         homePanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
-        // Title panel
+        // Panel tiêu đề
         JPanel titlePanel = new JPanel();
-        JLabel titleLabel = new JLabel("Tic Tac Toe");
+        JLabel titleLabel = new JLabel("Cờ Ca-rô");
         titleLabel.setFont(new Font("Arial", Font.BOLD, 36));
         titlePanel.add(titleLabel);
 
-        // Room list panel
+        // Panel danh sách phòng
         roomListPanel = new JPanel(new BorderLayout());
-        roomListPanel.setBorder(BorderFactory.createTitledBorder("Room List"));
+        roomListPanel.setBorder(BorderFactory.createTitledBorder("Danh sách phòng"));
         
         roomListModel = new DefaultListModel<>();
         roomList = new JList<>(roomListModel);
@@ -55,20 +55,20 @@ public class TicTacToeClient extends JFrame {
         JScrollPane scrollPane = new JScrollPane(roomList);
         scrollPane.setPreferredSize(new Dimension(300, 200));
         
-        // Control buttons panel
+        // Panel nút điều khiển
         JPanel buttonPanel = new JPanel();
         buttonPanel.setLayout(new FlowLayout());
 
-        JButton createRoomButton = new JButton("Create Room");
+        JButton createRoomButton = new JButton("Tạo phòng mới");
         createRoomButton.setFont(new Font("Arial", Font.BOLD, 16));
         
-        JButton joinRoomButton = new JButton("Join Room");
+        JButton joinRoomButton = new JButton("Vào phòng");
         joinRoomButton.setFont(new Font("Arial", Font.BOLD, 16));
         
-        JButton refreshButton = new JButton("Refresh");
+        JButton refreshButton = new JButton("Làm mới");
         refreshButton.setFont(new Font("Arial", Font.BOLD, 16));
         
-        JButton exitButton = new JButton("Exit");
+        JButton exitButton = new JButton("Thoát");
         exitButton.setFont(new Font("Arial", Font.BOLD, 16));
 
         buttonPanel.add(createRoomButton);
@@ -78,21 +78,21 @@ public class TicTacToeClient extends JFrame {
 
         roomListPanel.add(scrollPane, BorderLayout.CENTER);
 
-        // Add components to main panel
+        // Thêm các thành phần vào panel chính
         homePanel.add(titlePanel, BorderLayout.NORTH);
         homePanel.add(roomListPanel, BorderLayout.CENTER);
         homePanel.add(buttonPanel, BorderLayout.SOUTH);
 
-        // Add event listeners for buttons
+        // Thêm sự kiện cho các nút
         createRoomButton.addActionListener(e -> createRoom());
         joinRoomButton.addActionListener(e -> joinSelectedRoom());
         refreshButton.addActionListener(e -> refreshRoomList());
         exitButton.addActionListener(e -> System.exit(0));
 
-        // Display home screen
+        // Hiển thị màn hình chính
         getContentPane().add(homePanel);
         
-        // Connect to server to get room list
+        // Kết nối đến server để lấy danh sách phòng
         connectToServerForRoomList();
     }
 
@@ -107,7 +107,7 @@ public class TicTacToeClient extends JFrame {
     private void setupGamePanel() {
         gamePanel = new JPanel(new BorderLayout());
 
-        // Board panel
+        // Panel chứa bàn cờ
         JPanel boardPanel = new JPanel(new GridLayout(3, 3));
         buttons = new JButton[9];
         for (int i = 0; i < 9; i++) {
@@ -119,14 +119,14 @@ public class TicTacToeClient extends JFrame {
             boardPanel.add(buttons[i]);
         }
 
-        // Info panel
+        // Panel thông tin
         JPanel infoPanel = new JPanel(new BorderLayout());
-        statusLabel = new JLabel("Waiting for opponent...", SwingConstants.CENTER);
+        statusLabel = new JLabel("Đang chờ đối thủ...", SwingConstants.CENTER);
         statusLabel.setFont(new Font("Arial", Font.PLAIN, 20));
         statusLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         infoPanel.add(statusLabel, BorderLayout.CENTER);
 
-        // Add panels to game panel
+        // Thêm các panel vào game panel
         gamePanel.add(boardPanel, BorderLayout.CENTER);
         gamePanel.add(infoPanel, BorderLayout.SOUTH);
     }
@@ -143,8 +143,8 @@ public class TicTacToeClient extends JFrame {
         } catch (IOException e) {
             SwingUtilities.invokeLater(() -> {
                 JOptionPane.showMessageDialog(this,
-                        "Lost connection to server!\nError: " + e.getMessage(),
-                        "Connection Error",
+                        "Mất kết nối đến máy chủ!\nLỗi: " + e.getMessage(),
+                        "Lỗi Kết Nối",
                         JOptionPane.ERROR_MESSAGE);
                 System.exit(1);
             });
@@ -164,19 +164,19 @@ public class TicTacToeClient extends JFrame {
             });
         } else if (message.startsWith("BAT_DAU|")) {
             playerSymbol = message.split("\\|")[1];
-            statusLabel.setText("Game started - You are " + playerSymbol);
+            statusLabel.setText("Trò chơi bắt đầu - Bạn là " + playerSymbol);
             myTurn = false;
             enableBoard(false);
         } else if (message.equals("CHO_DOI_THU")) {
-            statusLabel.setText("Waiting for another player to join the room...");
+            statusLabel.setText("Đang chờ người chơi khác vào phòng...");
             myTurn = false;
             enableBoard(false);
         } else if (message.equals("LUOT_CUA_BAN")) {
-            statusLabel.setText("Your turn");
+            statusLabel.setText("Lượt của bạn");
             myTurn = true;
             enableBoard(true);
         } else if (message.equals("LUOT_DOI_THU")) {
-            statusLabel.setText("Opponent's turn");
+            statusLabel.setText("Lượt của đối thủ");
             myTurn = false;
             enableBoard(false);
         } else if (message.startsWith("DANH|")) {
@@ -196,7 +196,7 @@ public class TicTacToeClient extends JFrame {
             SwingUtilities.invokeLater(() -> {
                 JOptionPane.showMessageDialog(this,
                     errorMsg,
-                    "Error",
+                    "Lỗi",
                     JOptionPane.ERROR_MESSAGE);
             });
         }
@@ -224,10 +224,10 @@ public class TicTacToeClient extends JFrame {
     private void handleGameEnd(String result) {
         String message;
         if (result.equals("HOA")) {
-            message = "Game Over - Draw!";
+            message = "Kết thúc - Hòa!";
         } else {
             String winner = result.substring(0, 1);
-            message = winner.equals(playerSymbol) ? "Congratulations - You Win!" : "Sorry - You Lose!";
+            message = winner.equals(playerSymbol) ? "Chúc mừng - Bạn Thắng!" : "Rất tiếc - Bạn Thua!";
         }
         statusLabel.setText(message);
         enableBoard(false);
@@ -235,37 +235,37 @@ public class TicTacToeClient extends JFrame {
     }
 
     private void handleOpponentDisconnect() {
-        // When opponent disconnects, automatically return to waiting state
+        // Khi đối thủ disconnect, tự động về trạng thái chờ
         returnToLobby();
     }
 
     private void returnToLobby() {
-        System.out.println("Starting returnToLobby - returning to home screen");
-        // Reset board
+        System.out.println("Bắt đầu returnToLobby - trở về trang chủ");
+        // Reset bàn cờ
         for (JButton button : buttons) {
             button.setText("");
             button.setEnabled(false);
         }
-        // Reset state
+        // Reset trạng thái
         playerSymbol = null;
         myTurn = false;
         
-        // Close current connection
+        // Đóng kết nối hiện tại
         closeConnection();
         
-        // Return to home screen
+        // Quay về trang chủ
         getContentPane().removeAll();
         getContentPane().add(homePanel);
         revalidate();
         repaint();
-        System.out.println("Completed returnToLobby - returned to home screen");
+        System.out.println("Đã hoàn thành returnToLobby - đã trở về trang chủ");
     }
 
     private void showPlayAgainDialog() {
         int choice = JOptionPane.showConfirmDialog(
                 this,
-                "Do you want to play again?",
-                "Game Over",
+                "Bạn có muốn chơi lại không?",
+                "Kết thúc game",
                 JOptionPane.YES_NO_OPTION);
 
         if (choice == JOptionPane.YES_OPTION) {
@@ -281,7 +281,7 @@ public class TicTacToeClient extends JFrame {
             button.setText("");
             button.setEnabled(false);
         }
-        statusLabel.setText("Waiting for opponent...");
+        statusLabel.setText("Đang chờ đối thủ...");
         myTurn = false;
         out.println("CHOI_LAI");
     }
@@ -292,7 +292,7 @@ public class TicTacToeClient extends JFrame {
                 socket.close();
             }
         } catch (IOException e) {
-            System.err.println("Error closing connection: " + e.getMessage());
+            System.err.println("Lỗi khi đóng kết nối: " + e.getMessage());
         }
     }
 
@@ -302,16 +302,16 @@ public class TicTacToeClient extends JFrame {
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-            // Start thread to listen for messages from server
+            // Bắt đầu luồng lắng nghe tin nhắn từ server
             new Thread(this::listenForServerMessages).start();
 
-            // Request room list
+            // Yêu cầu danh sách phòng
             out.println("LAY_DANH_SACH_PHONG");
 
         } catch (IOException e) {
             JOptionPane.showMessageDialog(this,
-                    "Cannot connect to server!\nError: " + e.getMessage(),
-                    "Connection Error",
+                    "Không thể kết nối đến máy chủ!\nLỗi: " + e.getMessage(),
+                    "Lỗi Kết Nối",
                     JOptionPane.ERROR_MESSAGE);
             System.exit(1);
         }
@@ -319,8 +319,8 @@ public class TicTacToeClient extends JFrame {
 
     private void createRoom() {
         String roomName = JOptionPane.showInputDialog(this, 
-            "Enter room name:", 
-            "Create New Room", 
+            "Nhập tên phòng:", 
+            "Tạo phòng mới", 
             JOptionPane.PLAIN_MESSAGE);
         
         if (roomName != null && !roomName.trim().isEmpty()) {
@@ -336,8 +336,8 @@ public class TicTacToeClient extends JFrame {
             joinGame();
         } else {
             JOptionPane.showMessageDialog(this,
-                "Please select a room to join!",
-                "Notification",
+                "Vui lòng chọn một phòng để vào!",
+                "Thông báo",
                 JOptionPane.INFORMATION_MESSAGE);
         }
     }
@@ -359,7 +359,7 @@ public class TicTacToeClient extends JFrame {
             // Set Look and Feel
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
         } catch (UnsupportedLookAndFeelException | ClassNotFoundException | InstantiationException | IllegalAccessException e) {
-            System.err.println("Cannot set look and feel: " + e.getMessage());
+            System.err.println("Không thể thiết lập giao diện: " + e.getMessage());
         }
 
         SwingUtilities.invokeLater(() -> {
@@ -368,7 +368,7 @@ public class TicTacToeClient extends JFrame {
         });
     }
 
-    // Ensure connection is closed when closing window
+    // Đảm bảo đóng kết nối khi đóng cửa sổ
     @Override
     protected void processWindowEvent(WindowEvent e) {
         if (e.getID() == WindowEvent.WINDOW_CLOSING) {

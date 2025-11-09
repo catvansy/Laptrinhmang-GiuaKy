@@ -1,64 +1,64 @@
-# Tic Tac Toe Multiplayer Game
+# Game Tic Tac Toe Multiplayer
 
-Tic Tac Toe (3x3 Caro) game using Java Socket with Multi Client-Server model.
+Game Tic Tac Toe (Caro 3x3) sử dụng Java Socket với mô hình Multi Client-Server.
 
-## How to Run the Program
+## Cách chạy chương trình
 
-1. Navigate to the src directory:
+1. Di chuyển vào thư mục src:
 ```bash
 cd src
 ```
 
-2. Compile the Java files:
+2. Biên dịch các file Java:
 ```bash
 javac main/TicTacToeServer.java main/TicTacToeClient.java
 ```
 
-3. Run the Server:
+3. Chạy Server:
 ```bash
 java main.TicTacToeServer
 ```
 
-4. Run the Client (you can run multiple clients):
+4. Chạy Client (có thể chạy nhiều client):
 ```bash
 java main.TicTacToeClient
 ```
 
-## How to Play
+## Cách chơi
 
-1. Start the Server first
-2. Open 2 Client windows to start the game
-3. Server will automatically pair players
-4. Player X will go first
-5. Click on an empty cell to make a move
-6. Win by getting 3 identical symbols in a row (horizontal, vertical, or diagonal)
+1. Khởi động Server trước
+2. Mở 2 cửa sổ Client để bắt đầu game
+3. Server sẽ tự động ghép cặp người chơi
+4. Người chơi X sẽ đi trước
+5. Click vào ô trống để đánh
+6. Thắng khi có 3 ký hiệu giống nhau thẳng hàng (ngang, dọc, chéo)
 
-## Features
+## Tính năng
 
-- Graphical interface for Client (Swing)
-- Support for multiple player pairs simultaneously
-- Automatic player pairing
-- Disconnection handling
-- Game status display
-- Option to play again after game ends
+- Giao diện đồ họa cho Client (Swing)
+- Hỗ trợ nhiều cặp người chơi cùng lúc
+- Tự động ghép cặp người chơi
+- Xử lý ngắt kết nối
+- Hiển thị trạng thái game
+- Tùy chọn chơi lại sau khi game kết thúc
 
-## Client-Server Communication Protocol
+## Protocol giao tiếp Client-Server
 
-### From Server to Client:
-- `BAT_DAU|X` or `BAT_DAU|O`: Start game, assign symbol to player
-- `LUOT_CUA_BAN`: It's the current player's turn
-- `LUOT_DOI_THU`: It's the opponent's turn
-- `DANH|position|symbol`: New move (position and symbol)
-- `KET_THUC|result`: Game over (X_THANG, O_THANG, or HOA)
-- `DOI_THU_THOAT`: Opponent has disconnected
+### Từ Server đến Client:
+- `BAT_DAU|X` hoặc `BAT_DAU|O`: Bắt đầu game, chỉ định ký hiệu cho người chơi
+- `LUOT_CUA_BAN`: Đến lượt người chơi hiện tại
+- `LUOT_DOI_THU`: Đến lượt đối thủ
+- `DANH|position|symbol`: Nước đi mới (vị trí và ký hiệu)
+- `KET_THUC|result`: Kết thúc game (X_THANG, O_THANG, hoặc HOA)
+- `DOI_THU_THOAT`: Đối thủ đã ngắt kết nối
 
-### From Client to Server:
-- `DANH|position`: Send move (position 0-8)
-- `CHOI_LAI`: Request a new game
+### Từ Client đến Server:
+- `DANH|position`: Gửi nước đi (vị trí 0-8)
+- `CHOI_LAI`: Yêu cầu chơi game mới
 
-## Notes
+## Lưu ý
 
-- Server runs on port 5001
-- Default connection to localhost
-- Server must be running before starting Client
-- At least 2 Clients are needed to start a game
+- Server chạy trên port 5001
+- Mặc định kết nối đến localhost
+- Cần chạy Server trước khi chạy Client
+- Cần ít nhất 2 Client để bắt đầu game
