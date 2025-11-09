@@ -1,84 +1,64 @@
-# Tic Tac Toe (Caro 3x3) – Multiplayer qua Socket
+# Tic Tac Toe Multiplayer Game
 
-Ứng dụng Java Swing chơi Caro 3x3 qua mô hình Client–Server (TCP). Hỗ trợ sảnh phòng, chat và gửi file giữa 2 người chơi trong cùng phòng.
+Tic Tac Toe (3x3 Caro) game using Java Socket with Multi Client-Server model.
 
-## Yêu cầu
-- JDK 8+ (có `java` và `javac` trong PATH)
+## How to Run the Program
 
-## Chạy nhanh (Windows)
-Tại thư mục gốc dự án:
-
-1) Build:
-```bat
-build.bat
+1. Navigate to the src directory:
+```bash
+cd src
 ```
 
-2) Chạy server (một cửa sổ riêng):
-```bat
-run_server.bat
+2. Compile the Java files:
+```bash
+javac main/TicTacToeServer.java main/TicTacToeClient.java
 ```
 
-3) Chạy client (mỗi client một cửa sổ):
-```bat
-run_client.bat
+3. Run the Server:
+```bash
+java main.TicTacToeServer
 ```
 
-4) Làm sạch (xóa thư mục `out` và mọi `.class` rời):
-```bat
-clean.bat
+4. Run the Client (you can run multiple clients):
+```bash
+java main.TicTacToeClient
 ```
 
-Ghi chú: Các script ưu tiên chạy từ `out` nếu đã build; nếu chưa build, client/server có thể chạy trực tiếp từ `src`.
+## How to Play
 
-### Chạy bằng double‑click (File Explorer)
-- Có thể nhấp đúp các file: `build.bat`, `run_server.bat`, `run_client.bat`.
-- Script sẽ tự vào đúng thư mục, kiểm tra `java` trong PATH, chọn classpath (`out`/`src`) và dừng màn hình nếu có lỗi (pause) để bạn xem thông báo.
+1. Start the Server first
+2. Open 2 Client windows to start the game
+3. Server will automatically pair players
+4. Player X will go first
+5. Click on an empty cell to make a move
+6. Win by getting 3 identical symbols in a row (horizontal, vertical, or diagonal)
 
-## Cách để chạy game
-1. Khởi động server trước với `run_server.bat`.
-2. Mở 2 client bằng `run_client.bat` (mỗi client một cửa sổ).
-3. Khi client khởi chạy, nhập:
-   - Nickname: tùy ý
-   - Địa chỉ server: `localhost` (cùng máy) hoặc IP LAN của máy chạy server
-   - Cổng: `5001`
-4. Ở client 1: chọn “Tạo phòng mới” và đặt tên phòng.
-5. Ở client 2: chọn phòng trong danh sách và “Vào phòng”. Trò chơi sẽ bắt đầu.
-6. Bấm vào ô trên bàn cờ để đánh. Kết thúc ván có thể chọn “Chơi lại”.
+## Features
 
-## Tính năng
-- Giao diện Swing 3x3 với trạng thái lượt đi rõ ràng.
-- Sảnh phòng: tạo phòng, liệt kê và tham gia phòng còn trống.
-- Chat thời gian thực giữa 2 người chơi trong phòng.
-- Gửi/nhận file (giới hạn 2 MB, xác nhận lưu file khi nhận).
-- Xử lý ngắt kết nối: tự động đưa người còn lại về sảnh.
-- Chơi lại sau khi kết thúc ván.
+- Graphical interface for Client (Swing)
+- Support for multiple player pairs simultaneously
+- Automatic player pairing
+- Disconnection handling
+- Game status display
+- Option to play again after game ends
 
-## Giao thức Client–Server (tóm tắt)
-Từ Server → Client:
-- `DANH_SACH_PHONG|room1|room2|...`
-- `BAT_DAU|X|O`: thông báo biểu tượng của người chơi (client tự nhận `X` hoặc `O` từ payload)
-- `LUOT_CUA_BAN`, `LUOT_DOI_THU`
-- `DANH|position|symbol`
-- `KET_THUC|X` | `KET_THUC|O` | `KET_THUC|HOA`
-- `DOI_THU_THOAT`
-- `CHAT|from|text`
-- `FILE|from|filename|base64`
+## Client-Server Communication Protocol
 
-Từ Client → Server:
-- `NICK|nickname`: gửi nickname sau khi kết nối
-- `LAY_DANH_SACH_PHONG`
-- `TAO_PHONG|roomName`, `VAO_PHONG|roomName`
-- `DANH|position`
-- `CHOI_LAI`
-- `CHAT|text`
-- `FILE|filename|base64`
+### From Server to Client:
+- `BAT_DAU|X` or `BAT_DAU|O`: Start game, assign symbol to player
+- `LUOT_CUA_BAN`: It's the current player's turn
+- `LUOT_DOI_THU`: It's the opponent's turn
+- `DANH|position|symbol`: New move (position and symbol)
+- `KET_THUC|result`: Game over (X_THANG, O_THANG, or HOA)
+- `DOI_THU_THOAT`: Opponent has disconnected
 
-## Cấu hình mạng
-- Server mặc định chạy cổng `5001`.
-- Chơi LAN: nhập IP máy chạy server; cần cho phép Java qua tường lửa cổng 5001.
+### From Client to Server:
+- `DANH|position`: Send move (position 0-8)
+- `CHOI_LAI`: Request a new game
 
-## Khắc phục sự cố
-- Không kết nối được: kiểm tra server đã chạy, đúng IP/cổng, tường lửa không chặn.
-- Build lỗi với `*.java`: dùng `build.bat` (đã xử lý wildcard đúng cho Windows).
-- Không thấy cửa sổ mới: mở thủ công qua Cmd bằng các script trên hoặc chạy trực tiếp lệnh `java -cp out main.TicTacToeClient` sau khi build.
+## Notes
 
+- Server runs on port 5001
+- Default connection to localhost
+- Server must be running before starting Client
+- At least 2 Clients are needed to start a game
