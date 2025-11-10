@@ -3,6 +3,10 @@ package main;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.WindowEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import javax.sound.sampled.*;
+import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.*;
 
@@ -20,60 +24,87 @@ public class TicTacToeClient extends JFrame {
     private JPanel homePanel;
     private JPanel gamePanel;
 
+    private ConfettiOverlay confettiOverlay;
+
     public TicTacToeClient() {
         setTitle("Cờ Ca-rô");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setupHomeScreen();
-        setSize(400, 450);
+        setSize(520, 640);
         setLocationRelativeTo(null);
         setResizable(false);
+        setIconImage(generateAppIcon());
+        confettiOverlay = new ConfettiOverlay();
+        setGlassPane(confettiOverlay);
     }
 
     private JPanel roomListPanel;
     private DefaultListModel<String> roomListModel;
     private JList<String> roomList;
+    private JTextArea chatArea;
+    private JTextField chatInput;
+
+    // Theming - Light modern palette (no dark mode)
+    private final Color lightBg = new Color(244, 247, 255);
+    private final Color lightPanel = new Color(255, 255, 255);
+    private final Color lightText = new Color(32, 42, 64);
+    private final Color lightAccent = new Color(108, 99, 255); // modern indigo
+
+    private Font titleFont = new Font("Segoe UI", Font.BOLD, 36);
+    private Font bodyFont = new Font("Segoe UI", Font.PLAIN, 16);
+    private Font buttonFont = new Font("Segoe UI", Font.BOLD, 16);
+    private Font monoFont = new Font("Consolas", Font.PLAIN, 12);
 
     private void setupHomeScreen() {
-        homePanel = new JPanel();
+        homePanel = new GradientPanel();
         homePanel.setLayout(new BorderLayout());
         homePanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
         // Panel tiêu đề
-        JPanel titlePanel = new JPanel();
+        JPanel titlePanel = transparentPanel(new BorderLayout());
         JLabel titleLabel = new JLabel("Cờ Ca-rô");
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 36));
-        titlePanel.add(titleLabel);
+        titleLabel.setFont(titleFont);
+        titleLabel.setForeground(getPrimaryText());
+        titlePanel.add(titleLabel, BorderLayout.WEST);
+
+        // Right side space for potential future controls
+        JPanel rightBox = transparentPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        titlePanel.add(rightBox, BorderLayout.EAST);
 
         // Panel danh sách phòng
-        roomListPanel = new JPanel(new BorderLayout());
-        roomListPanel.setBorder(BorderFactory.createTitledBorder("Danh sách phòng"));
+        roomListPanel = roundedPanel(new BorderLayout());
+        roomListPanel.setBorder(BorderFactory.createTitledBorder(BorderFactory.createMatteBorder(1, 1, 1, 1, new Color(210, 218, 245)), "Danh sách phòng"));
         
         roomListModel = new DefaultListModel<>();
         roomList = new JList<>(roomListModel);
         roomList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        roomList.setFont(new Font("Arial", Font.PLAIN, 16));
+        roomList.setFont(bodyFont);
         JScrollPane scrollPane = new JScrollPane(roomList);
         scrollPane.setPreferredSize(new Dimension(300, 200));
+        scrollPane.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 1, 1, 1, new Color(210, 218, 245)),
+                BorderFactory.createEmptyBorder(6, 6, 6, 6)
+        ));
         
         // Panel nút điều khiển
-        JPanel buttonPanel = new JPanel();
+        JPanel buttonPanel = transparentPanel(new FlowLayout());
         buttonPanel.setLayout(new FlowLayout());
 
-        JButton createRoomButton = new JButton("Tạo phòng mới");
-        createRoomButton.setFont(new Font("Arial", Font.BOLD, 16));
+        JButton createRoomButton = themedButton("Tạo phòng mới");
         
-        JButton joinRoomButton = new JButton("Vào phòng");
-        joinRoomButton.setFont(new Font("Arial", Font.BOLD, 16));
+        JButton joinRoomButton = themedButton("Vào phòng");
         
-        JButton refreshButton = new JButton("Làm mới");
-        refreshButton.setFont(new Font("Arial", Font.BOLD, 16));
+        JButton refreshButton = themedButton("Làm mới");
         
-        JButton exitButton = new JButton("Thoát");
-        exitButton.setFont(new Font("Arial", Font.BOLD, 16));
+        JButton exitButton = themedButton("Thoát");
+
+        JButton leaderboardButton = new JButton("Bảng xếp hạng");
+        styleSecondaryButton(leaderboardButton);
 
         buttonPanel.add(createRoomButton);
         buttonPanel.add(joinRoomButton);
         buttonPanel.add(refreshButton);
+        buttonPanel.add(leaderboardButton);
         buttonPanel.add(exitButton);
 
         roomListPanel.add(scrollPane, BorderLayout.CENTER);
@@ -87,6 +118,7 @@ public class TicTacToeClient extends JFrame {
         createRoomButton.addActionListener(e -> createRoom());
         joinRoomButton.addActionListener(e -> joinSelectedRoom());
         refreshButton.addActionListener(e -> refreshRoomList());
+        leaderboardButton.addActionListener(e -> requestLeaderboard());
         exitButton.addActionListener(e -> System.exit(0));
 
         // Hiển thị màn hình chính
@@ -94,6 +126,9 @@ public class TicTacToeClient extends JFrame {
         
         // Kết nối đến server để lấy danh sách phòng
         connectToServerForRoomList();
+
+        // Apply theme
+        applyThemeRecursively(getContentPane());
     }
 
     private void startGame() {
@@ -105,30 +140,67 @@ public class TicTacToeClient extends JFrame {
     }
 
     private void setupGamePanel() {
-        gamePanel = new JPanel(new BorderLayout());
+        gamePanel = new GradientPanel();
+        gamePanel.setLayout(new BorderLayout());
 
         // Panel chứa bàn cờ
-        JPanel boardPanel = new JPanel(new GridLayout(3, 3));
+        JPanel boardPanel = roundedPanel(new GridLayout(3, 3));
         buttons = new JButton[9];
         for (int i = 0; i < 9; i++) {
-            buttons[i] = new JButton();
-            buttons[i].setFont(new Font("Arial", Font.BOLD, 60));
-            buttons[i].setFocusPainted(false);
+            buttons[i] = createBoardButton();
             final int position = i;
             buttons[i].addActionListener(e -> makeMove(position));
             boardPanel.add(buttons[i]);
         }
 
         // Panel thông tin
-        JPanel infoPanel = new JPanel(new BorderLayout());
+        JPanel infoPanel = roundedPanel(new BorderLayout());
         statusLabel = new JLabel("Đang chờ đối thủ...", SwingConstants.CENTER);
-        statusLabel.setFont(new Font("Arial", Font.PLAIN, 20));
+        statusLabel.setFont(bodyFont.deriveFont(Font.BOLD, 18f));
         statusLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        statusLabel.setForeground(getPrimaryText());
         infoPanel.add(statusLabel, BorderLayout.CENTER);
 
-        // Thêm các panel vào game panel
-        gamePanel.add(boardPanel, BorderLayout.CENTER);
-        gamePanel.add(infoPanel, BorderLayout.SOUTH);
+        // Khu vực chính: chứa board + info (giữ lớn, trung tâm)
+        JPanel mainArea = new JPanel(new BorderLayout());
+        mainArea.setOpaque(false);
+        mainArea.add(boardPanel, BorderLayout.CENTER);
+        mainArea.add(infoPanel, BorderLayout.SOUTH);
+
+        // Chat panel dạng nhỏ luôn cố định bên phải, không đè lên bàn cờ
+        JPanel chatPanel = roundedPanel(new BorderLayout());
+        chatPanel.setBorder(BorderFactory.createTitledBorder(BorderFactory.createMatteBorder(1, 1, 1, 1, new Color(210, 218, 245)), "Chat"));
+        chatArea = new JTextArea();
+        chatArea.setEditable(false);
+        chatArea.setLineWrap(true);
+        chatArea.setWrapStyleWord(true);
+        chatArea.setFont(bodyFont.deriveFont(14f));
+        chatArea.setBackground(getPanelBg());
+        chatArea.setForeground(getPrimaryText());
+        JScrollPane chatScroll = new JScrollPane(chatArea);
+        // Chiều rộng nhỏ để không chiếm chỗ, luôn hiển thị rõ ràng
+        chatScroll.setPreferredSize(new Dimension(180, 0));
+        chatScroll.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 1, 1, 1, new Color(210, 218, 245)),
+                BorderFactory.createEmptyBorder(6, 6, 6, 6)
+        ));
+        chatInput = new JTextField();
+        chatInput.setFont(bodyFont.deriveFont(14f));
+        JButton sendBtn = themedButton("Gửi");
+        sendBtn.setFont(bodyFont.deriveFont(Font.BOLD, 14f));
+        sendBtn.addActionListener(e -> sendChat());
+        chatInput.addActionListener(e -> sendChat());
+        JPanel chatInputPanel = new JPanel(new BorderLayout());
+        chatInputPanel.add(chatInput, BorderLayout.CENTER);
+        chatInputPanel.add(sendBtn, BorderLayout.EAST);
+        chatPanel.add(chatScroll, BorderLayout.CENTER);
+        chatPanel.add(chatInputPanel, BorderLayout.SOUTH);
+
+        // Thêm vào game panel: mainArea ở CENTER, chatPanel ở EAST (nhỏ, cố định)
+        gamePanel.add(mainArea, BorderLayout.CENTER);
+        gamePanel.add(chatPanel, BorderLayout.EAST);
+
+        applyThemeRecursively(gamePanel);
     }
 
 
@@ -187,10 +259,28 @@ public class TicTacToeClient extends JFrame {
         } else if (message.startsWith("KET_THUC|")) {
             String result = message.split("\\|")[1];
             handleGameEnd(result);
+        } else if (message.startsWith("HIGHLIGHT|")) {
+            String data = message.substring("HIGHLIGHT|".length());
+            String[] idx = data.split(",");
+            if (idx.length == 3) {
+                try {
+                    int a = Integer.parseInt(idx[0]);
+                    int b = Integer.parseInt(idx[1]);
+                    int c = Integer.parseInt(idx[2]);
+                    highlightWinningLine(a, b, c);
+                } catch (NumberFormatException ignored) {}
+            }
         } else if (message.equals("DOI_THU_THOAT")) {
             handleOpponentDisconnect();
         } else if (message.equals("VE_TRANG_CHU")) {
             returnToLobby();
+        } else if (message.startsWith("CHAT|")) {
+            String[] parts = message.split("\\|", 3);
+            if (parts.length >= 3) {
+                appendChat(parts[1], parts[2]);
+            }
+        } else if (message.startsWith("LEADERBOARD")) {
+            showLeaderboardDialog(message);
         } else if (message.startsWith("LOI|")) {
             String errorMsg = message.split("\\|")[1];
             SwingUtilities.invokeLater(() -> {
@@ -205,6 +295,12 @@ public class TicTacToeClient extends JFrame {
     private void updateBoard(int position, String symbol) {
         buttons[position].setText(symbol);
         buttons[position].setEnabled(false);
+        if ("X".equals(symbol)) {
+            buttons[position].setForeground(new Color(220, 20, 60));
+        } else {
+            buttons[position].setForeground(new Color(30, 144, 255));
+        }
+        Sound.playClick();
     }
 
     private void makeMove(int position) {
@@ -221,13 +317,28 @@ public class TicTacToeClient extends JFrame {
         }
     }
 
+    private void highlightWinningLine(int a, int b, int c) {
+        Color winColor = new Color(255, 241, 189);
+        buttons[a].setBackground(winColor);
+        buttons[b].setBackground(winColor);
+        buttons[c].setBackground(winColor);
+    }
+
     private void handleGameEnd(String result) {
         String message;
         if (result.equals("HOA")) {
             message = "Kết thúc - Hòa!";
+            Sound.playDraw();
+            showConfetti();
         } else {
             String winner = result.substring(0, 1);
             message = winner.equals(playerSymbol) ? "Chúc mừng - Bạn Thắng!" : "Rất tiếc - Bạn Thua!";
+            if (winner.equals(playerSymbol)) {
+                Sound.playWin();
+            } else {
+                Sound.playLose();
+            }
+            showConfetti();
         }
         statusLabel.setText(message);
         enableBoard(false);
@@ -245,6 +356,7 @@ public class TicTacToeClient extends JFrame {
         for (JButton button : buttons) {
             button.setText("");
             button.setEnabled(false);
+            button.setBackground(getBoardCellBg());
         }
         // Reset trạng thái
         playerSymbol = null;
@@ -259,6 +371,9 @@ public class TicTacToeClient extends JFrame {
         revalidate();
         repaint();
         System.out.println("Đã hoàn thành returnToLobby - đã trở về trang chủ");
+
+        // Kết nối lại lobby
+        connectToServerForRoomList();
     }
 
     private void showPlayAgainDialog() {
@@ -280,6 +395,7 @@ public class TicTacToeClient extends JFrame {
         for (JButton button : buttons) {
             button.setText("");
             button.setEnabled(false);
+            button.setBackground(getBoardCellBg());
         }
         statusLabel.setText("Đang chờ đối thủ...");
         myTurn = false;
@@ -346,12 +462,417 @@ public class TicTacToeClient extends JFrame {
         out.println("LAY_DANH_SACH_PHONG");
     }
 
+    private void requestLeaderboard() {
+        if (out != null) {
+            out.println("LAY_BANG_XEP_HANG");
+        }
+    }
+
+    private void showLeaderboardDialog(String message) {
+        // format: LEADERBOARD|name|wins|losses|draws|name|...
+        String[] parts = message.split("\\|");
+        if (parts.length <= 1) {
+            JOptionPane.showMessageDialog(this, "Chưa có dữ liệu bảng xếp hạng.", "Bảng xếp hạng", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("%-20s %6s %6s %6s%n", "Tên", "Thắng", "Thua", "Hòa"));
+        for (int i = 1; i + 3 < parts.length; i += 4) {
+            String name = parts[i];
+            String wins = parts[i + 1];
+            String losses = parts[i + 2];
+            String draws = parts[i + 3];
+            sb.append(String.format("%-20s %6s %6s %6s%n", name, wins, losses, draws));
+        }
+        JTextArea ta = new JTextArea(sb.toString());
+        ta.setEditable(false);
+        ta.setFont(monoFont);
+        JOptionPane.showMessageDialog(this, new JScrollPane(ta), "Bảng xếp hạng", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private void sendChat() {
+        String text = chatInput.getText().trim();
+        if (text.isEmpty() || out == null) return;
+        out.println("CHAT|" + text);
+        chatInput.setText("");
+    }
+
+    private void appendChat(String sender, String text) {
+        if (chatArea != null) {
+            chatArea.append(sender + ": " + text + "\n");
+            chatArea.setCaretPosition(chatArea.getDocument().getLength());
+        }
+    }
+
     private void joinGame() {
         getContentPane().removeAll();
         setupGamePanel();
         getContentPane().add(gamePanel);
         revalidate();
         repaint();
+    }
+
+    // ========== Theming helpers ==========
+    private Color getBackgroundGradientTop() { return new Color(238, 242, 255); }
+    private Color getBackgroundGradientBottom() { return new Color(252, 253, 255); }
+    private Color getPrimaryText() { return lightText; }
+    private Color getPanelBg() { return lightPanel; }
+    private Color getAccent() { return lightAccent; }
+    private Color getBoardCellBg() { return lightBg; }
+
+    private Color brighten(Color color, float fraction) {
+        fraction = Math.max(0f, Math.min(1f, fraction));
+        int r = color.getRed();
+        int g = color.getGreen();
+        int b = color.getBlue();
+        int a = color.getAlpha();
+        int nr = r + Math.round((255 - r) * fraction);
+        int ng = g + Math.round((255 - g) * fraction);
+        int nb = b + Math.round((255 - b) * fraction);
+        return new Color(Math.min(255, nr), Math.min(255, ng), Math.min(255, nb), a);
+    }
+
+    private Color darken(Color color, float fraction) {
+        fraction = Math.max(0f, Math.min(1f, fraction));
+        int r = color.getRed();
+        int g = color.getGreen();
+        int b = color.getBlue();
+        int a = color.getAlpha();
+        int nr = Math.round(r * (1f - fraction));
+        int ng = Math.round(g * (1f - fraction));
+        int nb = Math.round(b * (1f - fraction));
+        return new Color(Math.max(0, nr), Math.max(0, ng), Math.max(0, nb), a);
+    }
+
+    private JPanel roundedPanel(LayoutManager layout) {
+        JPanel p = new JPanel(layout) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                int w = getWidth();
+                int h = getHeight();
+                if (w > 0 && h > 0) {
+                    g2.setColor(new Color(27, 47, 94, 40));
+                    g2.fillRoundRect(10, 14, w - 18, h - 16, 28, 28);
+                    GradientPaint gp = new GradientPaint(0, 0,
+                            new Color(255, 255, 255, 250),
+                            0, h,
+                            new Color(232, 239, 255, 235));
+                    g2.setPaint(gp);
+                    g2.fillRoundRect(0, 0, w - 12, h - 14, 26, 26);
+                    g2.setColor(new Color(255, 255, 255, 120));
+                    g2.drawRoundRect(0, 0, w - 12, h - 14, 26, 26);
+                }
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        p.setOpaque(false);
+        p.setBorder(BorderFactory.createEmptyBorder(20, 26, 24, 24));
+        return p;
+    }
+
+    private JPanel transparentPanel(LayoutManager layout) {
+        JPanel p = new JPanel(layout);
+        p.setOpaque(false);
+        return p;
+    }
+
+    private JButton themedButton(String text) {
+        JButton b = new JButton(text) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                int w = getWidth();
+                int h = getHeight();
+                Color base = getBackground();
+                g2.setColor(new Color(27, 47, 94, 45));
+                g2.fillRoundRect(6, 9, w - 12, h - 10, 22, 22);
+                GradientPaint gp = new GradientPaint(0, 0, brighten(base, 0.25f), 0, h, base);
+                g2.setPaint(gp);
+                g2.fillRoundRect(0, 0, w - 6, h - 8, 20, 20);
+                g2.setColor(new Color(255, 255, 255, 120));
+                g2.drawRoundRect(0, 0, w - 6, h - 8, 20, 20);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        b.setFont(buttonFont);
+        b.setBackground(lightAccent);
+        b.setForeground(Color.WHITE);
+        b.setFocusPainted(false);
+        b.setContentAreaFilled(false);
+        b.setBorderPainted(false);
+        b.setBorder(BorderFactory.createEmptyBorder(14, 28, 14, 28));
+        b.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        b.setOpaque(false);
+        b.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                b.setBackground(brighten(lightAccent, 0.15f));
+            }
+            @Override
+            public void mouseExited(MouseEvent e) {
+                b.setBackground(lightAccent);
+            }
+            @Override
+            public void mousePressed(MouseEvent e) {
+                b.setBackground(darken(lightAccent, 0.2f));
+            }
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                b.setBackground(lightAccent);
+            }
+        });
+        return b;
+    }
+
+    private void styleSecondaryButton(JButton b) {
+        b.setFont(buttonFont);
+        b.setBackground(new Color(0, 0, 0, 0));
+        b.setForeground(getAccent());
+        b.setFocusPainted(false);
+        b.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 1, 1, 1, new Color(210, 218, 245)),
+                BorderFactory.createEmptyBorder(8, 18, 8, 18)
+        ));
+        b.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        b.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                b.setBackground(new Color(236, 242, 255));
+            }
+            @Override
+            public void mouseExited(MouseEvent e) {
+                b.setBackground(new Color(0, 0, 0, 0));
+            }
+        });
+    }
+
+    private JButton createBoardButton() {
+        JButton btn = new JButton() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                int w = getWidth();
+                int h = getHeight();
+                Color base = getBackground();
+                g2.setColor(new Color(27, 47, 94, 35));
+                g2.fillRoundRect(8, 10, w - 16, h - 12, 32, 32);
+                GradientPaint gp = new GradientPaint(0, 0, brighten(base, 0.18f), 0, h, base);
+                g2.setPaint(gp);
+                g2.fillRoundRect(0, 0, w - 8, h - 10, 30, 30);
+                g2.setColor(new Color(255, 255, 255, 150));
+                g2.drawRoundRect(0, 0, w - 8, h - 10, 30, 30);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 64));
+        btn.setFocusPainted(false);
+        btn.setContentAreaFilled(false);
+        btn.setBorderPainted(false);
+        btn.setOpaque(false);
+        btn.setBackground(getBoardCellBg());
+        btn.setForeground(new Color(52, 68, 125));
+        btn.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+        btn.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                if (btn.isEnabled() && btn.getText().isEmpty()) {
+                    btn.setBackground(brighten(getBoardCellBg(), 0.08f));
+                }
+            }
+            @Override
+            public void mouseExited(MouseEvent e) {
+                if (btn.getText().isEmpty()) {
+                    btn.setBackground(getBoardCellBg());
+                }
+            }
+            @Override
+            public void mousePressed(MouseEvent e) {
+                if (btn.isEnabled() && btn.getText().isEmpty()) {
+                    btn.setBackground(darken(getBoardCellBg(), 0.08f));
+                }
+            }
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                if (btn.getText().isEmpty()) {
+                    btn.setBackground(getBoardCellBg());
+                }
+            }
+        });
+        return btn;
+    }
+
+    private void applyThemeRecursively(Component comp) {
+        if (comp instanceof JComponent) {
+            if (!(comp instanceof AbstractButton)) {
+                comp.setForeground(getPrimaryText());
+            }
+            if (!(comp instanceof JScrollPane) && !(comp instanceof AbstractButton)) {
+                comp.setBackground(getPanelBg());
+            }
+        }
+        if (comp instanceof Container) {
+            for (Component child : ((Container) comp).getComponents()) {
+                applyThemeRecursively(child);
+            }
+        }
+        if (comp == homePanel || comp == gamePanel) {
+            comp.repaint();
+        }
+    }
+
+    private class GradientPanel extends JPanel {
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            GradientPaint gp = new GradientPaint(0, 0, getBackgroundGradientTop(),
+                    0, getHeight(), getBackgroundGradientBottom());
+            g2.setPaint(gp);
+            g2.fillRect(0, 0, getWidth(), getHeight());
+            g2.dispose();
+            super.paintComponent(g);
+        }
+
+        @Override
+        public boolean isOpaque() {
+            return false;
+        }
+    }
+
+    // ===== Sound effects (synthesized) =====
+    private static class Sound {
+        private static void playTone(double freq, int ms, double volume) {
+            try {
+                float sampleRate = 44100;
+                int numSamples = (int)((ms / 1000.0) * sampleRate);
+                byte[] data = new byte[numSamples];
+                for (int i = 0; i < numSamples; i++) {
+                    double angle = 2.0 * Math.PI * i * freq / sampleRate;
+                    double val = Math.sin(angle);
+                    int amp = (int)(val * 127 * volume);
+                    data[i] = (byte) amp;
+                }
+                AudioFormat format = new AudioFormat(sampleRate, 8, 1, true, false);
+                try (SourceDataLine line = AudioSystem.getSourceDataLine(format)) {
+                    line.open(format, numSamples);
+                    line.start();
+                    line.write(data, 0, data.length);
+                    line.drain();
+                }
+            } catch (Exception ignored) {}
+        }
+        public static void playClick() {
+            playTone(700, 50, 0.35);
+        }
+        public static void playWin() {
+            playTone(660, 100, 0.6);
+            playTone(880, 120, 0.6);
+            playTone(1046.5, 160, 0.6);
+        }
+        public static void playLose() {
+            playTone(523.3, 140, 0.6);
+            playTone(392.0, 160, 0.6);
+            playTone(329.6, 180, 0.6);
+        }
+        public static void playDraw() {
+            playTone(600, 120, 0.5);
+            playTone(600, 120, 0.5);
+        }
+    }
+
+    // ===== Confetti overlay =====
+    private void showConfetti() {
+        if (confettiOverlay != null) {
+            confettiOverlay.startAnimation(getWidth(), getHeight());
+            confettiOverlay.setVisible(true);
+        }
+    }
+
+    private static class ConfettiParticle {
+        float x, y, vx, vy, size, life;
+        Color color;
+    }
+
+    private class ConfettiOverlay extends JComponent {
+        private java.util.List<ConfettiParticle> particles = new java.util.ArrayList<>();
+        private javax.swing.Timer timer;
+
+        public void startAnimation(int width, int height) {
+            particles.clear();
+            java.util.Random rnd = new java.util.Random();
+            int count = 120;
+            for (int i = 0; i < count; i++) {
+                ConfettiParticle p = new ConfettiParticle();
+                p.x = rnd.nextInt(Math.max(1, width));
+                p.y = -rnd.nextInt(100);
+                p.vx = -1.5f + rnd.nextFloat() * 3.0f;
+                p.vy = 2.5f + rnd.nextFloat() * 3.5f;
+                p.size = 4 + rnd.nextFloat() * 6;
+                p.color = new Color(100 + rnd.nextInt(155), 100 + rnd.nextInt(155), 100 + rnd.nextInt(155));
+                p.life = 2.0f + rnd.nextFloat() * 1.5f;
+                particles.add(p);
+            }
+            if (timer != null && timer.isRunning()) timer.stop();
+            timer = new javax.swing.Timer(16, e -> {
+                float dt = 0.016f;
+                for (ConfettiParticle p : particles) {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.05f;
+                    p.life -= dt;
+                }
+                particles.removeIf(p -> p.life <= 0 || p.y > getHeight() + 20);
+                repaint();
+                if (particles.isEmpty()) {
+                    setVisible(false);
+                    timer.stop();
+                }
+            });
+            timer.start();
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            if (!isVisible()) return;
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            for (ConfettiParticle p : particles) {
+                g2.setColor(p.color);
+                g2.fillOval(Math.round(p.x), Math.round(p.y), Math.round(p.size), Math.round(p.size));
+            }
+            g2.dispose();
+        }
+    }
+
+    // ===== App icon generator =====
+    private Image generateAppIcon() {
+        int w = 64, h = 64;
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setColor(new Color(99, 132, 255));
+        g.fillRoundRect(0, 0, w, h, 14, 14);
+        g.setStroke(new BasicStroke(4f));
+        g.setColor(Color.WHITE);
+        int m = 12;
+        g.drawLine(m, h / 3, w - m, h / 3);
+        g.drawLine(m, 2 * h / 3, w - m, 2 * h / 3);
+        g.drawLine(w / 3, m, w / 3, h - m);
+        g.drawLine(2 * w / 3, m, 2 * w / 3, h - m);
+        g.setColor(new Color(255, 80, 120));
+        g.drawLine(m + 4, m + 4, w / 3 - 4, h / 3 - 4);
+        g.drawLine(w / 3 - 4, m + 4, m + 4, h / 3 - 4);
+        g.setColor(new Color(230, 250, 255));
+        g.drawOval(2 * w / 3 + 4 - 10, 2 * h / 3 + 4 - 10, 20, 20);
+        g.dispose();
+        return img;
     }
 
     public static void main(String[] args) {

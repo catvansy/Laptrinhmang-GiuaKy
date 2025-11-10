@@ -65,4 +65,13 @@ public class Room {
     public boolean hasPlayer(ClientHandler player) {
         return player == host || player == guest;
     }
+
+    public void broadcastToPlayers(String message) {
+        if (host != null) {
+            host.sendMessage(message);
+        }
+        if (guest != null) {
+            guest.sendMessage(message);
+        }
+    }
 }
