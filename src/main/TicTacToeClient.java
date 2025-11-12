@@ -25,6 +25,7 @@ public class TicTacToeClient extends JFrame {
 
     private JPanel homePanel;
     private JPanel gamePanel;
+    private JPanel boardPanel;
 
     private EffectOverlay effectOverlay;
 
@@ -54,6 +55,7 @@ public class TicTacToeClient extends JFrame {
     private JTextArea chatArea;
     private JTextField chatInput;
     private int boardSize = 3;
+    private volatile boolean intentionalDisconnect = false;
 
     // Theming - Light modern palette (no dark mode)
     private final Color lightBg = new Color(244, 247, 255);
@@ -105,7 +107,7 @@ public class TicTacToeClient extends JFrame {
         JButton refreshButton = themedButton("Làm mới");
         
         JButton exitButton = themedButton("Thoát");
-
+        
         JButton leaderboardButton = new JButton("Bảng xếp hạng");
         styleSecondaryButton(leaderboardButton);
 
@@ -179,7 +181,7 @@ public class TicTacToeClient extends JFrame {
         gamePanel.setLayout(new BorderLayout());
 
         // Panel chứa bàn cờ
-        JPanel boardPanel = roundedPanel(new GridLayout(boardSize, boardSize));
+        boardPanel = roundedPanel(new GridLayout(boardSize, boardSize));
         buttons = new JButton[boardSize * boardSize];
         for (int i = 0; i < buttons.length; i++) {
             buttons[i] = createBoardButton();
@@ -187,6 +189,13 @@ public class TicTacToeClient extends JFrame {
             buttons[i].addActionListener(e -> makeMove(position));
             boardPanel.add(buttons[i]);
         }
+        // Tự động điều chỉnh kích thước ô và font khi panel đổi kích thước
+        boardPanel.addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                updateBoardCellMetrics();
+            }
+        });
 
         // Panel thông tin
         JPanel infoPanel = roundedPanel(new BorderLayout());
@@ -245,13 +254,15 @@ public class TicTacToeClient extends JFrame {
                 SwingUtilities.invokeLater(() -> processServerMessage(finalMessage));
             }
         } catch (IOException e) {
-            SwingUtilities.invokeLater(() -> {
-                JOptionPane.showMessageDialog(this,
-                        "Mất kết nối đến máy chủ!\nLỗi: " + e.getMessage(),
-                        "Lỗi Kết Nối",
-                        JOptionPane.ERROR_MESSAGE);
-                System.exit(1);
-            });
+            if (!intentionalDisconnect) {
+                SwingUtilities.invokeLater(() -> {
+                    JOptionPane.showMessageDialog(this,
+                            "Mất kết nối đến máy chủ!\nLỗi: " + e.getMessage(),
+                            "Lỗi Kết Nối",
+                            JOptionPane.ERROR_MESSAGE);
+                    System.exit(1);
+                });
+            }
         }
     }
 
@@ -276,6 +287,19 @@ public class TicTacToeClient extends JFrame {
                         boardSize = newSize;
                         // rebuild board for new size
                         joinGame();
+                        // Điều chỉnh kích thước cửa sổ cho phù hợp
+                        if (boardSize >= 12) {
+                            setSize(860, 900);
+                        } else if (boardSize >= 9) {
+                            setSize(720, 820);
+                        } else {
+                            setSize(520, 640);
+                        }
+                        SwingUtilities.invokeLater(() -> {
+                            revalidate();
+                            repaint();
+                            updateBoardCellMetrics();
+                        });
                     }
                 } catch (NumberFormatException ignored) {}
             }
@@ -407,6 +431,7 @@ public class TicTacToeClient extends JFrame {
         myTurn = false;
         
         // Đóng kết nối hiện tại
+        intentionalDisconnect = true;
         closeConnection();
         
         // Quay về trang chủ
@@ -427,8 +452,7 @@ public class TicTacToeClient extends JFrame {
         if (choice == JOptionPane.YES_OPTION) {
             resetGame();
         } else {
-            closeConnection();
-            System.exit(0);
+            returnToLobby();
         }
     }
 
@@ -445,6 +469,7 @@ public class TicTacToeClient extends JFrame {
 
     private void closeConnection() {
         try {
+            intentionalDisconnect = true;
             if (socket != null && !socket.isClosed()) {
                 socket.close();
             }
@@ -458,6 +483,7 @@ public class TicTacToeClient extends JFrame {
             socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            intentionalDisconnect = false;
 
             // Bắt đầu luồng lắng nghe tin nhắn từ server
             new Thread(this::listenForServerMessages).start();
@@ -657,6 +683,7 @@ public class TicTacToeClient extends JFrame {
         btn.setOpaque(true);
         btn.setBackground(getBoardCellBg());
         btn.setBorder(BorderFactory.createMatteBorder(2, 2, 2, 2, new Color(80, 86, 96)));
+        btn.setMargin(new Insets(0, 0, 0, 0));
         btn.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseEntered(MouseEvent e) {
@@ -684,6 +711,22 @@ public class TicTacToeClient extends JFrame {
             }
         });
         return btn;
+    }
+
+    private void updateBoardCellMetrics() {
+        if (boardPanel == null || buttons == null || buttons.length == 0) return;
+        int w = Math.max(1, boardPanel.getWidth());
+        int h = Math.max(1, boardPanel.getHeight());
+        int cell = Math.max(10, Math.min(w, h) / Math.max(1, boardSize));
+        int fontPx = Math.max(14, Math.min(72, (int) Math.floor(cell * 0.65)));
+        Font f = new Font("Segoe UI", Font.BOLD, fontPx);
+        Dimension pref = new Dimension(Math.max(16, cell - 4), Math.max(16, cell - 4));
+        for (JButton b : buttons) {
+            b.setFont(f);
+            b.setPreferredSize(pref);
+        }
+        boardPanel.revalidate();
+        boardPanel.repaint();
     }
 
     private void applyThemeRecursively(Component comp) {
@@ -867,7 +910,7 @@ public class TicTacToeClient extends JFrame {
             toImage = null;
             transitionProgress = 1f;
             updateVisibility();
-            repaint();
+        repaint();
         }
 
         private void updateVisibility() {
