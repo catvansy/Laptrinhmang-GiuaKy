@@ -53,6 +53,7 @@ public class TicTacToeClient extends JFrame {
     private JList<String> roomList;
     private JTextArea chatArea;
     private JTextField chatInput;
+    private int boardSize = 3;
 
     // Theming - Light modern palette (no dark mode)
     private final Color lightBg = new Color(244, 247, 255);
@@ -178,9 +179,9 @@ public class TicTacToeClient extends JFrame {
         gamePanel.setLayout(new BorderLayout());
 
         // Panel chứa bàn cờ
-        JPanel boardPanel = roundedPanel(new GridLayout(3, 3));
-        buttons = new JButton[9];
-        for (int i = 0; i < 9; i++) {
+        JPanel boardPanel = roundedPanel(new GridLayout(boardSize, boardSize));
+        buttons = new JButton[boardSize * boardSize];
+        for (int i = 0; i < buttons.length; i++) {
             buttons[i] = createBoardButton();
             final int position = i;
             buttons[i].addActionListener(e -> makeMove(position));
@@ -266,7 +267,18 @@ public class TicTacToeClient extends JFrame {
                 }
             });
         } else if (message.startsWith("BAT_DAU|")) {
-            playerSymbol = message.split("\\|")[1];
+            String[] parts = message.split("\\|");
+            playerSymbol = parts[1];
+            if (parts.length >= 3) {
+                try {
+                    int newSize = Integer.parseInt(parts[2]);
+                    if (newSize >= 3 && newSize != boardSize) {
+                        boardSize = newSize;
+                        // rebuild board for new size
+                        joinGame();
+                    }
+                } catch (NumberFormatException ignored) {}
+            }
             statusLabel.setText("Trò chơi bắt đầu - Bạn là " + playerSymbol);
             myTurn = false;
             enableBoard(false);
@@ -293,13 +305,12 @@ public class TicTacToeClient extends JFrame {
         } else if (message.startsWith("HIGHLIGHT|")) {
             String data = message.substring("HIGHLIGHT|".length());
             String[] idx = data.split(",");
-            if (idx.length == 3) {
-                try {
-                    int a = Integer.parseInt(idx[0]);
-                    int b = Integer.parseInt(idx[1]);
-                    int c = Integer.parseInt(idx[2]);
-                    highlightWinningLine(a, b, c);
-                } catch (NumberFormatException ignored) {}
+            java.util.List<Integer> positions = new java.util.ArrayList<>();
+            for (String s : idx) {
+                try { positions.add(Integer.parseInt(s.trim())); } catch (NumberFormatException ignored) {}
+            }
+            if (!positions.isEmpty()) {
+                highlightWinningLine(positions);
             }
         } else if (message.equals("DOI_THU_THOAT")) {
             handleOpponentDisconnect();
@@ -348,11 +359,13 @@ public class TicTacToeClient extends JFrame {
         }
     }
 
-    private void highlightWinningLine(int a, int b, int c) {
+    private void highlightWinningLine(java.util.List<Integer> positions) {
         Color winColor = new Color(255, 230, 140);
-        buttons[a].setBackground(winColor);
-        buttons[b].setBackground(winColor);
-        buttons[c].setBackground(winColor);
+        for (Integer pos : positions) {
+            if (pos >= 0 && pos < buttons.length) {
+                buttons[pos].setBackground(winColor);
+            }
+        }
     }
 
     private void handleGameEnd(String result) {
@@ -468,7 +481,21 @@ public class TicTacToeClient extends JFrame {
             JOptionPane.PLAIN_MESSAGE);
         
         if (roomName != null && !roomName.trim().isEmpty()) {
-            out.println("TAO_PHONG|" + roomName.trim());
+            Object choice = JOptionPane.showInputDialog(
+                this,
+                "Chọn kích thước bàn cờ:",
+                "Kích thước",
+                JOptionPane.PLAIN_MESSAGE,
+                null,
+                new Object[]{"3 x 3 (nhanh)", "9 x 9 (lâu hơn)", "12 x 12 (lâu hơn)"},
+                "3 x 3 (nhanh)");
+            int size = 3;
+            if (choice != null) {
+                String s = choice.toString();
+                if (s.startsWith("9")) size = 9;
+                else if (s.startsWith("12")) size = 12;
+            }
+            out.println("TAO_PHONG|" + roomName.trim() + "|" + size);
             joinGame();
         }
     }
@@ -624,7 +651,8 @@ public class TicTacToeClient extends JFrame {
 
     private JButton createBoardButton() {
         JButton btn = new JButton();
-        btn.setFont(new Font("Segoe UI", Font.BOLD, 64));
+        int px = Math.max(18, Math.min(64, Math.round(420f / Math.max(boardSize, 5))));
+        btn.setFont(new Font("Segoe UI", Font.BOLD, px));
         btn.setFocusPainted(false);
         btn.setOpaque(true);
         btn.setBackground(getBoardCellBg());

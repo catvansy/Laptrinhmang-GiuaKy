@@ -109,13 +109,28 @@ public class TicTacToeServer {
             }
 
             if (message.startsWith("TAO_PHONG|")) {
-                String[] parts = message.split("\\|", 2);
+                String[] parts = message.split("\\|");
                 if (parts.length < 2 || parts[1].trim().isEmpty()) {
                     client.sendMessage("LOI|Tên phòng không hợp lệ");
                     return;
                 }
                 String roomName = parts[1].trim();
-                createRoom(client, roomName);
+                int size = 3;
+                if (parts.length >= 3) {
+                    try {
+                        size = Integer.parseInt(parts[2].trim());
+                        if (size <= 0) size = 3;
+                    } catch (NumberFormatException ignored) {}
+                }
+                if (rooms.containsKey(roomName)) {
+                    client.sendMessage("LOI|Phòng đã tồn tại");
+                    return;
+                }
+                Room room = new Room(roomName, client, size);
+                rooms.put(roomName, room);
+                client.setCurrentRoom(room);
+                client.sendMessage("CHO_DOI_THU");
+                broadcastRoomList();
                 return;
             }
 
@@ -203,13 +218,17 @@ class Game {
     private final ClientHandler player2; // Luôn là O
     private ClientHandler currentPlayer; // Người chơi đang đến lượt
     private final String[] board;
+    private final int size;
+    private final int targetRun;
     private boolean gameEnded;
-    private int[] lastWinLine = null; // 3 positions of winning line
+    private int[] lastWinLine = null; // winning line positions
 
-    public Game(ClientHandler player1, ClientHandler player2) {
+    public Game(ClientHandler player1, ClientHandler player2, int size) {
         this.player1 = player1;
         this.player2 = player2;
-        this.board = new String[9];
+        this.size = size <= 0 ? 3 : size;
+        this.targetRun = (this.size == 3) ? 3 : 5;
+        this.board = new String[this.size * this.size];
         Arrays.fill(board, "");
         this.gameEnded = false;
     }
@@ -224,8 +243,8 @@ class Game {
 
     public void start() {
         // Player1 luôn là X, Player2 luôn là O
-        player1.sendMessage("BAT_DAU|X");
-        player2.sendMessage("BAT_DAU|O");
+        player1.sendMessage("BAT_DAU|X|" + size);
+        player2.sendMessage("BAT_DAU|O|" + size);
 
         // Random chọn X hay O đi trước (dùng nanoTime để đảm bảo ngẫu nhiên)
         Random random = new Random(System.nanoTime());
@@ -247,7 +266,7 @@ class Game {
     }
 
     public synchronized void makeMove(ClientHandler player, int position) {
-        if (gameEnded || position < 0 || position >= 9 || !board[position].isEmpty()) {
+        if (gameEnded || position < 0 || position >= board.length || !board[position].isEmpty()) {
             return;
         }
 
@@ -288,32 +307,84 @@ class Game {
     }
 
     private boolean checkWin(String symbol) {
-        // Kiểm tra hàng ngang
-        for (int i = 0; i < 9; i += 3) {
-            if (board[i].equals(symbol) && board[i + 1].equals(symbol) && board[i + 2].equals(symbol)) {
-                lastWinLine = new int[]{i, i + 1, i + 2};
-                return true;
+        // Horizontal
+        for (int r = 0; r < size; r++) {
+            int count = 0;
+            for (int c = 0; c < size; c++) {
+                int idx = r * size + c;
+                if (board[idx].equals(symbol)) {
+                    count++;
+                    if (count >= targetRun) {
+                        lastWinLine = new int[targetRun];
+                        for (int k = 0; k < targetRun; k++) {
+                            lastWinLine[k] = r * size + (c - targetRun + 1 + k);
+                        }
+                        return true;
+                    }
+                } else {
+                    count = 0;
+                }
             }
         }
-
-        // Kiểm tra hàng dọc
-        for (int i = 0; i < 3; i++) {
-            if (board[i].equals(symbol) && board[i + 3].equals(symbol) && board[i + 6].equals(symbol)) {
-                lastWinLine = new int[]{i, i + 3, i + 6};
-                return true;
+        // Vertical
+        for (int c = 0; c < size; c++) {
+            int count = 0;
+            for (int r = 0; r < size; r++) {
+                int idx = r * size + c;
+                if (board[idx].equals(symbol)) {
+                    count++;
+                    if (count >= targetRun) {
+                        lastWinLine = new int[targetRun];
+                        for (int k = 0; k < targetRun; k++) {
+                            lastWinLine[k] = (r - targetRun + 1 + k) * size + c;
+                        }
+                        return true;
+                    }
+                } else {
+                    count = 0;
+                }
             }
         }
-
-        // Kiểm tra đường chéo
-        if (board[0].equals(symbol) && board[4].equals(symbol) && board[8].equals(symbol)) {
-            lastWinLine = new int[]{0, 4, 8};
-            return true;
+        // Diagonal down-right
+        for (int r = 0; r <= size - targetRun; r++) {
+            for (int c = 0; c <= size - targetRun; c++) {
+                boolean ok = true;
+                for (int k = 0; k < targetRun; k++) {
+                    int idx = (r + k) * size + (c + k);
+                    if (!board[idx].equals(symbol)) {
+                        ok = false;
+                        break;
+                    }
+                }
+                if (ok) {
+                    lastWinLine = new int[targetRun];
+                    for (int k = 0; k < targetRun; k++) {
+                        lastWinLine[k] = (r + k) * size + (c + k);
+                    }
+                    return true;
+                }
+            }
         }
-        if (board[2].equals(symbol) && board[4].equals(symbol) && board[6].equals(symbol)) {
-            lastWinLine = new int[]{2, 4, 6};
-            return true;
+        // Diagonal up-right
+        for (int r = targetRun - 1; r < size; r++) {
+            for (int c = 0; c <= size - targetRun; c++) {
+                boolean ok = true;
+                for (int k = 0; k < targetRun; k++) {
+                    int idx = (r - k) * size + (c + k);
+                    if (!board[idx].equals(symbol)) {
+                        ok = false;
+                        break;
+                    }
+                }
+                if (ok) {
+                    lastWinLine = new int[targetRun];
+                    for (int k = 0; k < targetRun; k++) {
+                        lastWinLine[k] = (r - k) * size + (c + k);
+                    }
+                    return true;
+                }
+            }
         }
-
         return false;
     }
 
@@ -333,9 +404,14 @@ class Game {
         player1.sendMessage(message);
         player2.sendMessage(message);
 
-        // Highlight line
-        if (lastWinLine != null) {
-            String highlight = "HIGHLIGHT|" + lastWinLine[0] + "," + lastWinLine[1] + "," + lastWinLine[2];
+        // Highlight line (variable length)
+        if (lastWinLine != null && lastWinLine.length > 0) {
+            StringBuilder sb = new StringBuilder("HIGHLIGHT|");
+            for (int i = 0; i < lastWinLine.length; i++) {
+                if (i > 0) sb.append(",");
+                sb.append(lastWinLine[i]);
+            }
+            String highlight = sb.toString();
             player1.sendMessage(highlight);
             player2.sendMessage(highlight);
         }

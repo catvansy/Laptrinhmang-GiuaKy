@@ -2,17 +2,27 @@ package main;
 
 public class Room {
     private final String name;
+    private final int size;
     private Game game;
     private ClientHandler host;
     private ClientHandler guest;
 
     public Room(String name, ClientHandler host) {
+        this(name, host, 3);
+    }
+
+    public Room(String name, ClientHandler host, int size) {
         this.name = name;
         this.host = host;
+        this.size = size <= 0 ? 3 : size;
     }
 
     public String getName() {
         return name;
+    }
+
+    public int getSize() {
+        return size;
     }
 
     public boolean isFull() {
@@ -47,7 +57,7 @@ public class Room {
 
     private void startGame() {
         if (host != null && guest != null) {
-            game = new Game(host, guest);
+            game = new Game(host, guest, size);
             game.start();
         }
     }
